@@ -1,0 +1,99 @@
+// Windows resources: manifest, screensaver name, settings dialog, version.
+#include <windows.h>
+#include "resource.h"
+
+1 RT_MANIFEST "theblackwall.manifest"
+IDI_APP ICON "theblackwall.ico"
+
+STRINGTABLE
+BEGIN
+    IDS_DESCRIPTION "The Black Wall"
+END
+
+IDD_CONFIG DIALOGEX 0, 0, 310, 355
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "The Black Wall - Settings"
+FONT 8, "MS Shell Dlg", 400, 0, 1
+BEGIN
+    GROUPBOX        "Motion", IDC_STATIC, 7, 7, 296, 116
+    AUTOCHECKBOX    "Side movement", IDC_SIDE, 14, 20, 120, 10
+    LTEXT           "Movement speed", IDC_SPEED_LBL, 30, 36, 80, 8
+    CONTROL         "", IDC_SPEED, "msctls_trackbar32", TBS_HORZ | TBS_AUTOTICKS | WS_TABSTOP, 112, 33, 150, 15
+    RTEXT           "", IDC_SPEED_VAL, 264, 36, 32, 8
+    AUTOCHECKBOX    "Mouse controlled rotation", IDC_MOUSEROT, 14, 52, 150, 10
+    AUTOCHECKBOX    "Exit on mouse move", IDC_EXITMOUSE, 14, 66, 150, 10
+    LTEXT           "Mouse move sensitivity", IDC_SENS_LBL, 30, 82, 80, 8
+    CONTROL         "", IDC_SENS, "msctls_trackbar32", TBS_HORZ | TBS_AUTOTICKS | WS_TABSTOP, 112, 79, 150, 15
+    RTEXT           "", IDC_SENS_VAL, 264, 82, 32, 8
+    AUTOCHECKBOX    "Mouse click resets the view", IDC_CLICKRESET, 30, 96, 160, 10
+    AUTOCHECKBOX    "Exit on any button   (unchecked: keys move the camera)", IDC_EXITKEY, 14, 110, 282, 10
+
+    GROUPBOX        "Wall", IDC_STATIC, 7, 128, 296, 167
+    LTEXT           "Wall density", IDC_STATIC, 14, 143, 90, 8
+    CONTROL         "", IDC_DENSITY, "msctls_trackbar32", TBS_HORZ | TBS_AUTOTICKS | WS_TABSTOP, 112, 140, 150, 15
+    RTEXT           "", IDC_DENSITY_VAL, 264, 143, 32, 8
+    LTEXT           "Wall pixel size", IDC_STATIC, 14, 160, 90, 8
+    CONTROL         "", IDC_PIXSIZE, "msctls_trackbar32", TBS_HORZ | TBS_AUTOTICKS | WS_TABSTOP, 112, 157, 150, 15
+    RTEXT           "", IDC_PIXSIZE_VAL, 264, 160, 32, 8
+    LTEXT           "Pixel blur amount", IDC_STATIC, 14, 177, 90, 8
+    CONTROL         "", IDC_BLUR, "msctls_trackbar32", TBS_HORZ | TBS_AUTOTICKS | WS_TABSTOP, 112, 174, 150, 15
+    RTEXT           "", IDC_BLUR_VAL, 264, 177, 32, 8
+    LTEXT           "Pixel ghost tail length", IDC_STATIC, 14, 194, 90, 8
+    CONTROL         "", IDC_GHOST, "msctls_trackbar32", TBS_HORZ | TBS_AUTOTICKS | WS_TABSTOP, 112, 191, 150, 15
+    RTEXT           "", IDC_GHOST_VAL, 264, 194, 32, 8
+    LTEXT           "Pixel shimmer  (0 = smooth)", IDC_STATIC, 14, 211, 96, 8
+    CONTROL         "", IDC_SHIMMER, "msctls_trackbar32", TBS_HORZ | TBS_AUTOTICKS | WS_TABSTOP, 112, 208, 150, 15
+    RTEXT           "", IDC_SHIMMER_VAL, 264, 211, 32, 8
+    LTEXT           "Pixel type", IDC_STATIC, 14, 228, 60, 8
+    AUTORADIOBUTTON "Square", IDC_PT_SQUARE, 112, 227, 45, 10, WS_GROUP | WS_TABSTOP
+    AUTORADIOBUTTON "Round", IDC_PT_ROUND, 162, 227, 45, 10
+    AUTORADIOBUTTON "Matrix code", IDC_PT_MATRIX, 212, 227, 60, 10
+    LTEXT           "Wall color", IDC_STATIC, 14, 245, 40, 8
+    CONTROL         "", IDC_WALLCOL, "Button", BS_OWNERDRAW | WS_TABSTOP, 56, 242, 36, 13
+    LTEXT           "Floor color", IDC_STATIC, 112, 245, 40, 8
+    CONTROL         "", IDC_FLOORCOL, "Button", BS_OWNERDRAW | WS_TABSTOP, 154, 242, 36, 13
+    LTEXT           "Space color", IDC_STATIC, 210, 245, 42, 8
+    CONTROL         "", IDC_SPACECOL, "Button", BS_OWNERDRAW | WS_TABSTOP, 254, 242, 36, 13
+    AUTOCHECKBOX    "Distant city on the opposite horizon", IDC_HORIZON, 14, 261, 150, 10
+    LTEXT           "City color", IDC_STATIC, 210, 262, 42, 8
+    CONTROL         "", IDC_CITYCOL, "Button", BS_OWNERDRAW | WS_TABSTOP, 254, 259, 36, 13
+    AUTOCHECKBOX    "Show ghosts  (figures appear by the wall every 100 m of travel)", IDC_GHOSTS, 14, 276, 282, 10
+
+    GROUPBOX        "Power", IDC_STATIC, 7, 299, 296, 30
+    LTEXT           "Frame rate limit", IDC_STATIC, 14, 313, 90, 8
+    CONTROL         "", IDC_FPS, "msctls_trackbar32", TBS_HORZ | TBS_AUTOTICKS | WS_TABSTOP, 112, 310, 150, 15
+    RTEXT           "", IDC_FPS_VAL, 264, 313, 32, 8
+
+    PUSHBUTTON      "Defaults", IDC_DEFAULTS, 7, 334, 50, 14
+    PUSHBUTTON      "Position the ghosts...", IDC_POSE, 62, 334, 84, 14
+    DEFPUSHBUTTON   "OK", IDOK, 195, 334, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 253, 334, 50, 14
+END
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION 1,0,0,0
+ PRODUCTVERSION 1,0,0,0
+ FILEFLAGSMASK 0x3fL
+ FILEFLAGS 0x0L
+ FILEOS VOS_NT_WINDOWS32
+ FILETYPE VFT_APP
+ FILESUBTYPE VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "FileDescription", "The Black Wall screensaver"
+            VALUE "FileVersion", "1.0.0.0"
+            VALUE "InternalName", "TheBlackWall"
+            VALUE "LegalCopyright", "MIT License"
+            VALUE "OriginalFilename", "TheBlackWall.scr"
+            VALUE "ProductName", "The Black Wall"
+            VALUE "ProductVersion", "1.0.0.0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END
