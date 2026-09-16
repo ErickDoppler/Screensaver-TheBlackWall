@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Headless checks of the Linux build. Run under Xvfb with software OpenGL:
-#   xvfb-run -a -s "-screen 0 1280x720x24" .github/scripts/linux-smoke.sh
+#   xvfb-run -a -s "-screen 0 1280x720x24 -noreset" .github/scripts/linux-smoke.sh
 # Writes screenshots and logs to out/smoke.
 set -euo pipefail
 
@@ -99,7 +99,9 @@ step "the embedded process follows its window when it goes away"
 kill "$PARENT"
 wait "$PARENT" 2>/dev/null || true
 wait_gone "$HACK" 5 || die "still running 5 s after its window was destroyed"
+code=0; wait "$HACK" || code=$?
 cat "$OUT/embedded.log"
+[ "$code" -eq 0 ] || die "exit code $code after its window was destroyed (an X error ended it?)"
 grep -q "start: mode=3 640x360" "$OUT/embedded.log" || die "unexpected start line"
 
 # ---------------------------------------------------------------------------

@@ -42,12 +42,12 @@ jobs:
       - name: Headless smoke tests
         env:
           LIBGL_ALWAYS_SOFTWARE: "1"
-        run: xvfb-run -a -s "-screen 0 1280x720x24" .github/scripts/linux-smoke.sh
+        run: xvfb-run -a -s "-screen 0 1280x720x24 -noreset" .github/scripts/linux-smoke.sh
 
       - name: 3. Install, then run inside XScreenSaver
         env:
           LIBGL_ALWAYS_SOFTWARE: "1"
-        run: xvfb-run -a -s "-screen 0 1280x720x24" .github/scripts/xscreensaver-e2e.sh
+        run: xvfb-run -a -s "-screen 0 1280x720x24 -noreset" .github/scripts/xscreensaver-e2e.sh
 
       - name: Uninstall
         run: |
