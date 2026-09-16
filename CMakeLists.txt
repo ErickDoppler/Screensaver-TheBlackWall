@@ -56,7 +56,10 @@ add_custom_command(
   COMMAND ${CMAKE_COMMAND} -DOUT=${BW_SHADERS_GEN} "-DINPUTS=${BW_SHADER_ABS}"
           -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/embed.cmake
   DEPENDS ${BW_SHADER_ABS} cmake/embed.cmake
-  COMMENT "Embedding GLSL shaders")
+  COMMENT "Embedding GLSL shaders"
+  # INPUTS is a ;-separated list: VERBATIM quotes it, or a Unix shell would
+  # take each ; as the end of a command.
+  VERBATIM)
 
 # ---------------------------------------------------------------------------
 # The figures: vertices of the models in res/models become embedded tables
@@ -93,7 +96,8 @@ foreach(entry ${BW_MODEL_LIST})
     COMMAND $<TARGET_FILE:gltf2points> ${CMAKE_CURRENT_SOURCE_DIR}/res/models/${mfile}
             ${mout} ${BW_MODEL_POINTS} ${mname} ${mheight}
     DEPENDS gltf2points ${CMAKE_CURRENT_SOURCE_DIR}/res/models/${mfile}
-    COMMENT "Converting figure model ${mname}")
+    COMMENT "Converting figure model ${mname}"
+    VERBATIM)
   list(APPEND BW_MODEL_GEN ${mout})
 endforeach()
 
@@ -135,9 +139,23 @@ if(WIN32)
   target_compile_definitions(TheBlackWall PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN)
 else()
   target_link_libraries(TheBlackWall PRIVATE m)
+  # Xlib directly, for drawing inside XScreenSaver's window (platform_linux.c).
+  find_package(X11 REQUIRED)
+  # The GL 1.1 entry points come from libGL, as they come from opengl32 on
+  # Windows (see gl_loader.h). libGL is also what SDL loads for GLX, so both
+  # dispatch to the same context.
+  set(OpenGL_GL_PREFERENCE LEGACY)
+  find_package(OpenGL REQUIRED)
+  target_link_libraries(TheBlackWall PRIVATE X11::X11 OpenGL::GL)
   set_target_properties(TheBlackWall PROPERTIES OUTPUT_NAME theblackwall)
+  if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    target_link_options(TheBlackWall PRIVATE $<$<CONFIG:Release>:-s>)
+  endif()
   include(GNUInstallDirs)
-  # XScreenSaver looks for hacks in its libexec dir and their config in share.
+  # XScreenSaver looks for hacks in its hack directory and their settings
+  # pages in its config directory. Distributions disagree on the first
+  # (Debian, Ubuntu, Fedora: libexec/xscreensaver; Arch: lib/xscreensaver);
+  # tools/install-linux.sh finds the right one and passes it in.
   set(BW_XSS_HACKDIR "${CMAKE_INSTALL_LIBEXECDIR}/xscreensaver" CACHE PATH "XScreenSaver hack directory")
   set(BW_XSS_CONFDIR "${CMAKE_INSTALL_DATADIR}/xscreensaver/config" CACHE PATH "XScreenSaver config directory")
   install(TARGETS TheBlackWall RUNTIME DESTINATION ${BW_XSS_HACKDIR})

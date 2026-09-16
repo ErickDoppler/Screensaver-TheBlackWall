@@ -30,6 +30,12 @@
       "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" }
     },
     {
+      "name": "linux-debug",
+      "inherits": "linux",
+      "binaryDir": "${sourceDir}/build/linux-debug",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    },
+    {
       "name": "linux-system-sdl",
       "inherits": "linux",
       "binaryDir": "${sourceDir}/build/linux-system-sdl",
@@ -40,6 +46,7 @@
     { "name": "win-mingw", "configurePreset": "win-mingw" },
     { "name": "win-mingw-debug", "configurePreset": "win-mingw-debug" },
     { "name": "linux", "configurePreset": "linux" },
+    { "name": "linux-debug", "configurePreset": "linux-debug" },
     { "name": "linux-system-sdl", "configurePreset": "linux-system-sdl" }
   ]
 }

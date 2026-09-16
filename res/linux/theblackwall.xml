@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<!-- XScreenSaver settings page for The Black Wall. Installed next to the
+     other hacks' pages by tools/install-linux.sh (cmake install). Every
+     default below matches src/settings.h, so an untouched control passes no
+     option and the built-in default applies. -->
+
+<screensaver name="theblackwall" _label="The Black Wall" gl="yes">
+
+  <command arg="--root"/>
+
+  <number id="fps" type="slider" arg="--fps %"
+          _label="Frame rate limit" _low-label="10 fps" _high-label="120 fps"
+          low="10" high="120" default="60"/>
+
+  <boolean id="sidemovement" _label="Side movement"
+           arg-unset="--no-side-movement"/>
+  <boolean id="horizon" _label="Distant city on the opposite horizon"
+           arg-unset="--no-horizon"/>
+  <boolean id="ghosts" _label="Show ghosts (figures appear every 100 m)"
+           arg-unset="--no-show-ghosts"/>
+
+  <number id="speed" type="slider" arg="--movement-speed %"
+          _label="Movement speed" _low-label="Slow" _high-label="Fast"
+          low="0" high="100" default="30"/>
+
+  <number id="density" type="slider" arg="--density %"
+          _label="Wall density" _low-label="Sparse" _high-label="Dense"
+          low="0" high="100" default="100"/>
+
+  <number id="pixelsize" type="slider" arg="--pixel-size %"
+          _label="Wall pixel size" _low-label="Fine" _high-label="Chunky"
+          low="0" high="100" default="42"/>
+
+  <select id="pixeltype">
+    <option id="square" _label="Square pixels"/>
+    <option id="round"  _label="Round pixels"  arg-set="--pixel-type round"/>
+    <option id="matrix" _label="Matrix code"   arg-set="--pixel-type matrix"/>
+  </select>
+
+  <number id="blur" type="slider" arg="--blur %"
+          _label="Pixel blur amount" _low-label="Sharp" _high-label="Soft"
+          low="0" high="100" default="20"/>
+
+  <number id="ghosttail" type="slider" arg="--ghost-tail %"
+          _label="Pixel ghost tail length" _low-label="None" _high-label="Long"
+          low="0" high="100" default="30"/>
+
+  <number id="shimmer" type="slider" arg="--shimmer %"
+          _label="Pixel shimmer" _low-label="Smooth" _high-label="Tearing"
+          low="0" high="100" default="0"/>
+
+  <string id="wallcolor"    _label="Wall color (#RRGGBB)"    arg="--wall-color %"/>
+  <string id="floorcolor"   _label="Floor color (#RRGGBB)"   arg="--floor-color %"/>
+  <string id="spacecolor"   _label="Space color (#RRGGBB)"   arg="--space-color %"/>
+  <string id="horizoncolor" _label="City color (#RRGGBB)"    arg="--horizon-color %"/>
+
+  <_description>
+An endless wall of glowing pixels standing on a dark floor in empty space,
+inspired by the Blackwall of Cyberpunk 2077. It breathes with the machine:
+CPU load tightens its wave, network traffic pushes spikes through it, and
+now and then a figure fades in ahead and the wall rises to take it.
+
+Leave a color empty to keep the default (wall #FF3B1F, floor #140507,
+space #04000A, city #3FA0FF).
+
+https://github.com/ErickDoppler/Screensaver-TheBlackWall
+
+Written by Erick Doppler; 2026.
+  </_description>
+</screensaver>

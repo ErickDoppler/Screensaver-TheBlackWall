@@ -3,7 +3,8 @@
 #define BW_PLATFORM_H
 #include <stdint.h>
 
-/* Persistent settings store (Windows: HKCU\Software\TheBlackWall). */
+/* Persistent settings store (Windows: HKCU\Software\TheBlackWall;
+ * Linux: $XDG_CONFIG_HOME/theblackwall/settings.conf). */
 int plat_store_read_int(const char *key, int *out);   /* 1 if the key existed */
 int plat_store_write_int(const char *key, int value); /* 1 on success */
 
@@ -26,5 +27,12 @@ int   plat_win32_window_alive(void *hwnd);
 /* Runs the modal settings dialog (the /c mode). Returns 1 if the user asked
  * for the figure positioning tool, which the caller then runs in-process. */
 int   plat_win32_config_dialog(void *parent_hwnd);
+#else
+/* X11 windows owned by another program (XScreenSaver). Ids are XIDs; these
+ * use a private display connection, so they work alongside SDL's. */
+/* Size of `win` in pixels. Returns 0 if the window no longer exists. */
+int   plat_x11_window_size(unsigned long win, int *w, int *h);
+/* Moves `child` (still unmapped) into `parent` at 0,0 and maps it there. */
+int   plat_x11_embed(unsigned long child, unsigned long parent);
 #endif
 #endif

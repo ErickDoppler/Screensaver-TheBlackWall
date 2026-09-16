@@ -42,6 +42,7 @@ typedef struct App {
     float       land_t;             /* when the last one came down */
     float       elapsed;            /* seconds since start */
     float       mouse_travel;       /* accumulated motion for exit-on-move */
+    float       parent_check_at;    /* MODE_EMBEDDED: next look at the owner's window */
     int         frames;
 } App;
 
@@ -62,13 +63,46 @@ static SDL_Window *create_window(App *a) {
         SDL_DestroyProperties(p);
         return NULL;
 #endif
+#ifndef _WIN32
+    } else if (cfg->mode == MODE_EMBEDDED) {
+        /* SDL draws on a GL context whose config it picks itself, and that
+         * need not match the visual of the window XScreenSaver made. So SDL
+         * gets a window of its own, created hidden, which is then moved
+         * inside XScreenSaver's window and mapped there. */
+        unsigned long parent = (unsigned long)(uintptr_t)cfg->parent_hwnd;
+        int w = 0, h = 0;
+        if (!plat_x11_window_size(parent, &w, &h)) {
+            SDL_SetError("window 0x%lx does not exist", parent);
+            SDL_DestroyProperties(p);
+            return NULL;
+        }
+        SDL_SetNumberProperty(p, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, w);
+        SDL_SetNumberProperty(p, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, h);
+        SDL_SetBooleanProperty(p, SDL_PROP_WINDOW_CREATE_BORDERLESS_BOOLEAN, true);
+        SDL_SetBooleanProperty(p, SDL_PROP_WINDOW_CREATE_HIDDEN_BOOLEAN, true);
+        SDL_Window *win = SDL_CreateWindowWithProperties(p);
+        SDL_DestroyProperties(p);
+        if (!win) return NULL;
+        unsigned long child = (unsigned long)SDL_GetNumberProperty(
+            SDL_GetWindowProperties(win), SDL_PROP_WINDOW_X11_WINDOW_NUMBER, 0);
+        if (!child || !plat_x11_embed(child, parent)) {
+            SDL_SetError("could not embed into window 0x%lx", parent);
+            SDL_DestroyWindow(win);
+            return NULL;
+        }
+        return win;
+#endif
     } else if (cfg->mode == MODE_FULLSCREEN) {
         int x = 0, y = 0, w = 1280, h = 720;
 #ifdef _WIN32
         plat_win32_virtual_screen(&x, &y, &w, &h);
 #else
+        /* Let the window manager or compositor make it fullscreen: on Wayland
+         * a client cannot position itself, and X11 window managers keep
+         * panels above a plain borderless window. */
         SDL_Rect b;
         if (SDL_GetDisplayBounds(SDL_GetPrimaryDisplay(), &b)) { x = b.x; y = b.y; w = b.w; h = b.h; }
+        SDL_SetBooleanProperty(p, SDL_PROP_WINDOW_CREATE_FULLSCREEN_BOOLEAN, true);
 #endif
         SDL_SetNumberProperty(p, SDL_PROP_WINDOW_CREATE_X_NUMBER, x);
         SDL_SetNumberProperty(p, SDL_PROP_WINDOW_CREATE_Y_NUMBER, y);
@@ -155,6 +189,13 @@ static void reset_view(App *a) {
 }
 
 static void request_exit(App *a) { a->running = 0; }
+
+/* Keyboard and mouse belong to us only in our own windows. In the Windows
+ * preview and inside XScreenSaver the owner of the window decides what input
+ * means (XScreenSaver unlocks or kills us on its own). */
+static int takes_input(const App *a) {
+    return a->cfg->mode == MODE_FULLSCREEN || a->cfg->mode == MODE_WINDOW;
+}
 
 /* Full 360-degree yaw: the user may turn around to face the city horizon. */
 static float wrap_angle(float a) {
@@ -287,19 +328,19 @@ static void poll_events(App *a) {
             SDL_GetWindowSizeInPixels(a->win, &a->width, &a->height);
             break;
         case SDL_EVENT_KEY_DOWN:
-            if (a->cfg->mode != MODE_PREVIEW) {
+            if (takes_input(a)) {
                 if (!e.key.repeat && e.key.key != SDLK_ESCAPE) mark_input(a);
                 handle_key(a, &e.key);
             }
             break;
         case SDL_EVENT_MOUSE_MOTION:
-            if (a->cfg->mode != MODE_PREVIEW) handle_mouse_motion(a, &e.motion);
+            if (takes_input(a)) handle_mouse_motion(a, &e.motion);
             break;
         case SDL_EVENT_MOUSE_BUTTON_DOWN:
-            if (a->cfg->mode != MODE_PREVIEW) handle_mouse_button(a);
+            if (takes_input(a)) handle_mouse_button(a);
             break;
         case SDL_EVENT_MOUSE_WHEEL:
-            if (a->cfg->mode != MODE_PREVIEW && !a->s.exit_on_any_key) {
+            if (takes_input(a) && !a->s.exit_on_any_key) {
                 /* Wheel moves along the view direction, like the W/S keys. */
                 float step = e.wheel.y * 0.6f;
                 a->cam.x += (double)(sinf(a->cam.yaw) * step);
@@ -324,7 +365,7 @@ static void update_camera(App *a, float dt) {
                                               : lerpf(0.15f, 3.0f, a->s.movement_speed / 100.f);
         a->cam.x += speed * dt;
     }
-    if (a->cfg->mode == MODE_PREVIEW) return;
+    if (!takes_input(a)) return;
     if (a->cfg->mode == MODE_FULLSCREEN && a->s.exit_on_any_key) return;
     const bool *k = SDL_GetKeyboardState(NULL);
     float mv = 4.f * foot_speed_mult(a) * dt, rot = 1.2f * dt;
@@ -401,6 +442,8 @@ int app_run(const AppConfig *cfg) {
     }
 
     SDL_SetHint(SDL_HINT_VIDEO_ALLOW_SCREENSAVER, "1");
+    /* XScreenSaver hands us an X11 window, even under XWayland. */
+    if (cfg->mode == MODE_EMBEDDED) SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "x11");
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
         plat_log("SDL_Init: %s", SDL_GetError());
         return 2;
@@ -462,6 +505,17 @@ int app_run(const AppConfig *cfg) {
         poll_events(&a);
 #ifdef _WIN32
         if (cfg->mode == MODE_PREVIEW && !plat_win32_window_alive(cfg->parent_hwnd)) break;
+#else
+        if (cfg->mode == MODE_EMBEDDED && a.elapsed >= a.parent_check_at) {
+            /* Follow the owner's window: stop when it is gone (XScreenSaver
+             * normally sends SIGTERM first, which SDL turns into a quit) and
+             * track its size, which the settings preview may change. */
+            a.parent_check_at = a.elapsed + 0.5f;
+            int pw, ph, cw, ch;
+            if (!plat_x11_window_size((unsigned long)(uintptr_t)cfg->parent_hwnd, &pw, &ph)) break;
+            SDL_GetWindowSize(a.win, &cw, &ch);
+            if (pw != cw || ph != ch) SDL_SetWindowSize(a.win, pw, ph);
+        }
 #endif
         if (!a.running) break;
 
