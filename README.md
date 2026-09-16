@@ -9,16 +9,85 @@ traffic pushes spikes through it.
 Status: **Windows 1.0, stable.** Linux (XScreenSaver) is planned; the build
 system is already laid out for it.
 
-## Build (Windows)
+## Run it
 
-Everything is open source and portable, living under `C:\workenv`
-(see [docs/TOOLING.md](docs/TOOLING.md)). No Visual Studio needed.
+### Windows
 
-```bat
-tools\build-windows.cmd
-```
+Everything is portable and open source. Nothing is installed system-wide
+except the screensaver itself, and Visual Studio is not needed.
 
-or by hand:
+1. **Get the build tools.** Downloads GCC, CMake, Ninja and the SDL3 source
+   into `C:\workenv`, checking every archive against a pinned SHA-256. Run it
+   once; running it again only verifies what is already there.
+
+   ```bat
+   1-downloads-tools.cmd
+   ```
+
+2. **Build the screensaver.** Produces `build\win-mingw\TheBlackWall.scr`,
+   a single static executable with no runtime dependencies. Takes a couple of
+   minutes the first time, because SDL3 is compiled from source.
+
+   ```bat
+   2-build-for-win64.cmd
+   ```
+
+3. **Install it.** Copies the `.scr` into `%LOCALAPPDATA%\TheBlackWall` and
+   makes it the active screensaver for the current user.
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File tools\install-windows.ps1
+   ```
+
+To look at it before installing, run `build\win-mingw\TheBlackWall.scr /w`
+for a window or `/s` for fullscreen; `Esc` always exits.
+
+### Linux
+
+**Not buildable yet.** XScreenSaver support is planned and the build system
+is already laid out for it, but the platform layer (`src/platform_linux.c`)
+and the XScreenSaver config (`res/linux/theblackwall.xml`) have not been
+written, so the `linux` preset fails at configure time. Everything else -
+the simulation, the renderer, the shaders - is portable C11 and OpenGL 3.3
+and needs no changes.
+
+Once those two files exist, the steps will be:
+
+1. **Get the build tools.** GCC or Clang, CMake, Ninja, and the headers SDL3
+   builds against (X11, Wayland, OpenGL). On Debian or Ubuntu:
+
+   ```sh
+   sudo apt install build-essential cmake ninja-build git \
+        libx11-dev libxext-dev libxrandr-dev libwayland-dev libgl1-mesa-dev
+   ```
+
+2. **Build the screensaver.** Produces `build/linux/theblackwall`. Add
+   `-DBW_SYSTEM_SDL=ON`, or use the `linux-system-sdl` preset, to link an
+   SDL3 already on the system instead of compiling it.
+
+   ```sh
+   cmake --preset linux
+   cmake --build --preset linux
+   ```
+
+3. **Install it.** Puts the binary in XScreenSaver's hack directory and its
+   config in `share/xscreensaver/config`, after which it can be picked in
+   `xscreensaver-settings`.
+
+   ```sh
+   sudo cmake --install build/linux
+   ```
+
+## Build options (Windows)
+
+The two numbered scripts above are the whole story for a normal build; this
+section is for when you want something other than a plain Release build.
+
+`2-build-for-win64.cmd` takes `debug` (symbols, into
+`build\win-mingw-debug`) and `clean` (discard the build folder first). Set
+`BW_WORKENV` if the toolchain lives somewhere other than `C:\workenv`.
+
+By hand, with the toolchain on PATH:
 
 ```bat
 call tools\env.cmd
@@ -26,17 +95,17 @@ cmake --preset win-mingw
 cmake --build --preset win-mingw
 ```
 
-Output: `build\win-mingw\TheBlackWall.scr`, a single static executable.
+`tools\build-windows.cmd` does those three lines in one step. Note that
+`tools\env.cmd` puts w64devkit first on PATH, so it uses the CMake bundled
+inside w64devkit rather than the pinned one in `C:\workenv`;
+`2-build-for-win64.cmd` prefers the pinned copy.
 
-## Install (Windows)
+Output either way: `build\win-mingw\TheBlackWall.scr`, a single static
+executable. See [docs/TOOLING.md](docs/TOOLING.md) for what is in the
+toolchain and why.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File tools\install-windows.ps1
-```
-
-This copies the `.scr` to `%LOCALAPPDATA%\TheBlackWall` and selects it as
-the active screensaver for the current user. Alternatively right-click the
-`.scr` and choose **Install**.
+Besides the installer script, you can right-click the `.scr` in Explorer and
+choose **Install**.
 
 ## Windows Defender
 
