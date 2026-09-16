@@ -6,8 +6,10 @@ empty space. The wall stretches to infinity left and right and fades away
 upward. It breathes with your machine: CPU load tightens its wave, network
 traffic pushes spikes through it.
 
-Status: **Windows 1.0, stable.** Linux (XScreenSaver) is planned; the build
-system is already laid out for it.
+Status: **Windows 1.0, stable.** **Linux (XScreenSaver): new.** It builds on
+Ubuntu 22.04 and 24.04 (x86-64 and Arm64), Debian, Fedora, Arch and
+openSUSE, and renders under Ubuntu; the tests of drawing inside
+XScreenSaver's window are still being brought up in CI.
 
 ## Run it
 
@@ -42,41 +44,57 @@ except the screensaver itself, and Visual Studio is not needed.
 To look at it before installing, run `build\win-mingw\TheBlackWall.scr /w`
 for a window or `/s` for fullscreen; `Esc` always exits.
 
+A ready-made `TheBlackWall.scr` is also attached to each
+[release](https://github.com/ErickDoppler/Screensaver-TheBlackWall/releases).
+
 ### Linux
 
-**Not buildable yet.** XScreenSaver support is planned and the build system
-is already laid out for it, but the platform layer (`src/platform_linux.c`)
-and the XScreenSaver config (`res/linux/theblackwall.xml`) have not been
-written, so the `linux` preset fails at configure time. Everything else -
-the simulation, the renderer, the shaders - is portable C11 and OpenGL 3.3
-and needs no changes.
+The screensaver runs as an [XScreenSaver](https://www.jwz.org/xscreensaver/)
+hack, with its own page in `xscreensaver-settings`. The scripts handle apt,
+dnf, pacman and zypper (Debian, Ubuntu, Fedora, Arch, openSUSE) on x86-64 and
+Arm64.
 
-Once those two files exist, the steps will be:
-
-1. **Get the build tools.** GCC or Clang, CMake, Ninja, and the headers SDL3
-   builds against (X11, Wayland, OpenGL). On Debian or Ubuntu:
-
-   ```sh
-   sudo apt install build-essential cmake ninja-build git \
-        libx11-dev libxext-dev libxrandr-dev libwayland-dev libgl1-mesa-dev
-   ```
-
-2. **Build the screensaver.** Produces `build/linux/theblackwall`. Add
-   `-DBW_SYSTEM_SDL=ON`, or use the `linux-system-sdl` preset, to link an
-   SDL3 already on the system instead of compiling it.
+1. **Get the build tools.** Installs a C compiler and the X11, Wayland and
+   OpenGL development headers with your package manager (it asks for your
+   password), then downloads CMake, Ninja and the SDL3 source into
+   `~/workenv`, checking every archive against a pinned SHA-256. Run it once;
+   running it again only verifies what is already there.
 
    ```sh
-   cmake --preset linux
-   cmake --build --preset linux
+   ./1-downloads-tools.sh
    ```
 
-3. **Install it.** Puts the binary in XScreenSaver's hack directory and its
-   config in `share/xscreensaver/config`, after which it can be picked in
+2. **Build the screensaver.** Produces `build/linux/theblackwall`, a single
+   executable with SDL3 built in; at run time it needs only libc, libX11 and
+   libGL, which every desktop has.
+   Takes a couple of minutes the first time, because SDL3 is compiled from
+   source.
+
+   ```sh
+   ./2-build-for-linux.sh
+   ```
+
+3. **Install it.** Copies the binary into XScreenSaver's hack directory and
+   its settings page into XScreenSaver's config directory (it asks for your
+   password), then puts The Black Wall at the top of your list in
+   `~/.xscreensaver` and makes it the one XScreenSaver shows. The previous
+   `~/.xscreensaver` is kept as `~/.xscreensaver.bak-theblackwall`.
+
+   ```sh
+   ./tools/install-linux.sh
+   ```
+
+   If XScreenSaver is not installed or not running, the script says how to
+   get it going (`sudo apt install xscreensaver xscreensaver-gl`, then
+   `xscreensaver --no-splash &`). Timeout and options are then in
    `xscreensaver-settings`.
 
-   ```sh
-   sudo cmake --install build/linux
-   ```
+To look at it before installing, run `build/linux/theblackwall --window` for
+a window or `-s` for fullscreen; `Esc` always exits.
+
+XScreenSaver only blanks X11 sessions, and GNOME and KDE run their own
+screen lockers instead of it unless you turn those off. On Wayland, or
+without XScreenSaver, the binary still runs fullscreen with `-s`.
 
 ## Build options (Windows)
 
@@ -107,6 +125,41 @@ toolchain and why.
 Besides the installer script, you can right-click the `.scr` in Explorer and
 choose **Install**.
 
+## Build and install options (Linux)
+
+`1-downloads-tools.sh [dir] [--force] [--no-packages]`: install the toolchain
+into `dir` instead of `~/workenv` (or set `BW_WORKENV`); `--force` unpacks
+again; `--no-packages` skips the package manager when you already have a
+compiler, `pkg-config`, `curl`, `unzip` and the X11 and OpenGL development
+files.
+
+`2-build-for-linux.sh [debug] [clean]`: `debug` builds with symbols into
+`build/linux-debug`, `clean` discards the build folder first. It uses the
+pinned CMake and Ninja from the workenv when they are there, and the system's
+otherwise (CMake 3.25 or newer).
+
+`tools/install-linux.sh` options:
+
+| Option          | Effect |
+|-----------------|--------|
+| `--user`        | no sudo: installs into `~/.local/libexec/theblackwall`. XScreenSaver runs it, but its settings page needs the system-wide install, so options then come from `settings.conf` (see below). |
+| `--no-activate` | add it to the list without making it the only screensaver; the current selection stays on the same hack |
+| `--uninstall`   | remove the files and the entry in `~/.xscreensaver` |
+
+By hand:
+
+```sh
+cmake --preset linux -DFETCHCONTENT_SOURCE_DIR_SDL3=$HOME/workenv/SDL3-3.4.16
+cmake --build --preset linux
+```
+
+Without `FETCHCONTENT_SOURCE_DIR_SDL3`, CMake downloads the same pinned SDL3
+itself. The `linux-system-sdl` preset links an SDL3 already installed on the
+system instead. For packaging, `cmake --install build/linux --prefix /usr`
+installs the binary into `libexec/xscreensaver` and the settings page into
+`share/xscreensaver/config`; set `BW_XSS_HACKDIR` for distributions that keep
+hacks elsewhere (Arch: `lib/xscreensaver`).
+
 ## Windows Defender
 
 An unsigned, freshly built `.scr` can trip Defender's machine-learning
@@ -135,6 +188,16 @@ Windows calls the screensaver with the standard switches:
 | `/p <hwnd>` | live preview inside the Windows screensaver dialog   |
 | `/c`        | settings dialog (also the default with no arguments) |
 
+XScreenSaver calls it the way it calls its own hacks:
+
+| Switch             | Meaning                                                   |
+|--------------------|-----------------------------------------------------------|
+| `--root`           | draw inside XScreenSaver's window (`$XSCREENSAVER_WINDOW`); fullscreen when that is not set |
+| `--window-id <id>` | draw inside the given X11 window (the settings preview)   |
+| `-s`               | run fullscreen                                            |
+
+With no switch at all, the Linux build opens a window.
+
 Developer switches:
 
 | Switch                          | Meaning                                          |
@@ -153,7 +216,11 @@ Setting keys: `side-movement`, `movement-speed`, `mouse-rotation`,
 `pixel-type` (square/round/matrix), `horizon` (distant city, default on),
 `fps` (10..120, default 60), `wall-color`, `floor-color`, `space-color`,
 `horizon-color` (default blue).
-Settings persist in `HKCU\Software\TheBlackWall`.
+Settings persist in `HKCU\Software\TheBlackWall` on Windows. On Linux they
+are read from `~/.config/theblackwall/settings.conf` (`$XDG_CONFIG_HOME`),
+one `key = value` per line with the keys above: numbers in decimal (switches
+0 or 1, `pixel-type` 0 square, 1 round, 2 matrix) and colors as `#RRGGBB`
+(e.g. `wall-color = #ff3b1f`). The options XScreenSaver passes override them.
 
 **Figures.** Every 100 m of travel along the wall a character from
 Cyberpunk 2077 slowly fades in 36 m ahead, standing 10 m from the wall; come
@@ -212,17 +279,23 @@ click exits.
 ## Layout
 
 ```
-src/            portable C11 core (SDL3 + OpenGL 3.3)
+src/            portable C11 core (SDL3 + OpenGL 3.3); platform_win32.c and
+                platform_linux.c hold what differs per OS
 src/shaders/    GLSL, embedded into the binary at build time
 res/win32/      dialog, manifest, version info
+res/linux/      XScreenSaver settings page
+res/models/     figure models, turned into point tables at build time
 cmake/          toolchain file + shader embedding script
-tools/          env / build / install helpers
+tools/          env / build / install helpers, model converter
 docs/           design and tooling notes
-third_party/    stb_image_write.h (public domain)
+third_party/    stb_image_write.h (public domain), cgltf.h (MIT)
+.github/        Linux CI: build on Ubuntu and other distributions, then run
+                it headless and inside a live XScreenSaver
 ```
 
 See [docs/DESIGN.md](docs/DESIGN.md) for how the wall is simulated and drawn.
 
 ## License
 
-MIT. Dependencies: SDL3 (zlib), stb (public domain / MIT).
+MIT. Dependencies: SDL3 (zlib), stb (public domain / MIT), cgltf (MIT, used
+only at build time); on Linux also libX11 (MIT).
