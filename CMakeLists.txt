@@ -56,7 +56,10 @@ add_custom_command(
   COMMAND ${CMAKE_COMMAND} -DOUT=${BW_SHADERS_GEN} "-DINPUTS=${BW_SHADER_ABS}"
           -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/embed.cmake
   DEPENDS ${BW_SHADER_ABS} cmake/embed.cmake
-  COMMENT "Embedding GLSL shaders")
+  COMMENT "Embedding GLSL shaders"
+  # INPUTS is a ;-separated list: VERBATIM quotes it, or a Unix shell would
+  # take each ; as the end of a command.
+  VERBATIM)
 
 # ---------------------------------------------------------------------------
 # The figures: vertices of the models in res/models become embedded tables
@@ -93,7 +96,8 @@ foreach(entry ${BW_MODEL_LIST})
     COMMAND $<TARGET_FILE:gltf2points> ${CMAKE_CURRENT_SOURCE_DIR}/res/models/${mfile}
             ${mout} ${BW_MODEL_POINTS} ${mname} ${mheight}
     DEPENDS gltf2points ${CMAKE_CURRENT_SOURCE_DIR}/res/models/${mfile}
-    COMMENT "Converting figure model ${mname}")
+    COMMENT "Converting figure model ${mname}"
+    VERBATIM)
   list(APPEND BW_MODEL_GEN ${mout})
 endforeach()
 
