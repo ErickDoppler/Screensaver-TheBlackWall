@@ -2,7 +2,7 @@
 # End to end: install with tools/install-linux.sh, start a real XScreenSaver,
 # blank the screen and check that The Black Wall is what it shows. Run under
 # Xvfb:
-#   xvfb-run -a -s "-screen 0 1280x720x24" .github/scripts/xscreensaver-e2e.sh
+#   xvfb-run -a -s "-screen 0 1280x720x24 -noreset" .github/scripts/xscreensaver-e2e.sh
 # Writes logs and a screenshot to out/xscreensaver.
 set -euo pipefail
 
@@ -20,7 +20,7 @@ command -v magick >/dev/null 2>&1 && IM=magick
 # Software rendering at full density is slow; the settings file keeps the
 # frame times short (the saver is started with no options of its own).
 mkdir -p "$HOME/.config/theblackwall"
-printf 'density = 30\nfps = 30\n' > "$HOME/.config/theblackwall/settings.conf"
+printf 'density = 80\nfps = 30\n' > "$HOME/.config/theblackwall/settings.conf"
 
 step "install"
 rm -f "$HOME/.xscreensaver"

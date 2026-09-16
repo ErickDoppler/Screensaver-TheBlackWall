@@ -34,5 +34,7 @@ int   plat_win32_config_dialog(void *parent_hwnd);
 int   plat_x11_window_size(unsigned long win, int *w, int *h);
 /* Moves `child` (still unmapped) into `parent` at 0,0 and maps it there. */
 int   plat_x11_embed(unsigned long child, unsigned long parent);
+/* 1 once the embedded window has been destroyed (with its parent). */
+int   plat_x11_embed_lost(void);
 #endif
 #endif

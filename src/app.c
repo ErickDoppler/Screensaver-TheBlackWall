@@ -506,6 +506,7 @@ int app_run(const AppConfig *cfg) {
 #ifdef _WIN32
         if (cfg->mode == MODE_PREVIEW && !plat_win32_window_alive(cfg->parent_hwnd)) break;
 #else
+        if (cfg->mode == MODE_EMBEDDED && plat_x11_embed_lost()) break;
         if (cfg->mode == MODE_EMBEDDED && a.elapsed >= a.parent_check_at) {
             /* Follow the owner's window: stop when it is gone (XScreenSaver
              * normally sends SIGTERM first, which SDL turns into a quit) and

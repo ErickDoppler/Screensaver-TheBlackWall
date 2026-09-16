@@ -233,6 +233,27 @@ int plat_x11_window_size(unsigned long win, int *w, int *h) {
     return 1;
 }
 
+/* Once embedded, our window dies with XScreenSaver's, usually between two
+ * frames: the next buffer swap then fails with BadDrawable on SDL's own
+ * connection, and Xlib's default handler would end the process on the spot.
+ * This handler stays installed instead; it notes that the window is gone,
+ * which the main loop checks every frame, and logs anything else. */
+static unsigned long g_embedded;
+static int g_embed_lost;
+
+static int x_embed_error_handler(Display *d, XErrorEvent *e) {
+    (void)d;
+    if ((e->error_code == BadWindow || e->error_code == BadDrawable) &&
+        e->resourceid == g_embedded) {
+        if (!g_embed_lost) plat_log("our window went away with its parent");
+        g_embed_lost = 1;
+    } else {
+        plat_log("X error %d (request %d.%d) on 0x%lx", e->error_code,
+                 e->request_code, e->minor_code, (unsigned long)e->resourceid);
+    }
+    return 0;
+}
+
 int plat_x11_embed(unsigned long child, unsigned long parent) {
     Display *d = x_display();
     if (!d || !child || !parent) return 0;
@@ -240,6 +261,15 @@ int plat_x11_embed(unsigned long child, unsigned long parent) {
     XReparentWindow(d, (Window)child, (Window)parent, 0, 0);
     XMapWindow(d, (Window)child);
     int ok = x_trap_end(d, prev);
-    if (!ok) plat_log("X error %d while embedding into window 0x%lx", g_x_error, parent);
-    return ok;
+    if (!ok) {
+        plat_log("X error %d while embedding into window 0x%lx", g_x_error, parent);
+        return 0;
+    }
+    g_embedded = child;
+    XSetErrorHandler(x_embed_error_handler);
+    return 1;
+}
+
+int plat_x11_embed_lost(void) {
+    return g_embed_lost;
 }
