@@ -13,58 +13,6 @@ Ubuntu 22.04 and 24.04 (x86-64 and Arm64), Debian, Fedora, Arch and openSUSE,
 and renders and embeds in other programs' windows under Ubuntu; the
 end-to-end test with a live XScreenSaver is still being brought up in CI.
 
-## What you see
-
-<table>
-  <tr>
-    <td width="50%"><img src="docs/screenshot-calm.png" alt="A calm wall"><br>
-      <sub>An idle machine: the wall barely breathes.</sub></td>
-    <td width="50%"><img src="docs/screenshot-heavy-traffic.png" alt="Spikes in the wall"><br>
-      <sub>Heavy network traffic pushes spikes through it.</sub></td>
-  </tr>
-  <tr>
-    <td><img src="docs/screenshot-figure.png" alt="A yellow figure ahead"><br>
-      <sub>Every 100 m a figure fades in ahead. AIs are yellow.</sub></td>
-    <td><img src="docs/screenshot-ghost.png" alt="A blue figure"><br>
-      <sub>Humans are blue.</sub></td>
-  </tr>
-  <tr>
-    <td><img src="docs/screenshot-alt.png" alt="Alt in front of the wall"><br>
-      <sub>Alt, an engram, stands 15 m tall.</sub></td>
-    <td><img src="docs/screenshot-ghost-wave.png" alt="The wall rising as a wave"><br>
-      <sub>Come within 10 m and the wall rises as a wave to take the figure.</sub></td>
-  </tr>
-  <tr>
-    <td><img src="docs/screenshot-scar.png" alt="A figure burnt into the wall"><br>
-      <sub>Its shadow stays burnt into the wall, then dissolves into static.</sub></td>
-    <td><img src="docs/screenshot-city.png" alt="A blue city skyline"><br>
-      <sub>Turn around: a distant city on the opposite horizon.</sub></td>
-  </tr>
-  <tr>
-    <td><img src="docs/screenshot-far-back.png" alt="The wall far away"><br>
-      <sub>Step back down the corridor, up to 1 km.</sub></td>
-    <td><img src="docs/screenshot-tv-off.png" alt="Black screen with faint lines"><br>
-      <sub>At 999 m the screen switches off, leaving faint CCTV lines.</sub></td>
-  </tr>
-</table>
-
-**Figures.** Every 100 m of travel along the wall a character from
-Cyberpunk 2077 slowly fades in 36 m ahead, standing 10 m from the wall. Come
-within 10 m and the wall rises as a giant wave and swallows it, leaving its
-shadow burnt into the wall, which then dissolves into sparkling static. Seven
-figures (Johnny, Alt, Songbird, Brendan, Skippy, David, Jackie) are built from
-the GLB models in `res/models`, colored by nature: engrams crimson, half-human
-gold, AIs yellow, humans blue. The **Show ghosts** option turns them off.
-Each figure's facing is set once in the pose tool (**Position the ghosts...**
-in the Windows dialog, or `--window --pose`): Up/Down pick the figure,
-Left/Right rotate it in 45-degree steps, Enter saves, Esc cancels.
-
-**The corridor.** You can step back up to 1 km from the wall. Beyond 50 m it
-looms taller, figures appear at your depth and the wave comes all the way out
-to take them. From 900 m the picture picks up static, from 970 m it breaks up
-like a damaged video, and at 999 m the screen switches off, leaving faint
-CCTV lines. Walk back toward the wall and the picture returns.
-
 ## Run it
 
 ### Windows
