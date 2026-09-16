@@ -135,9 +135,19 @@ if(WIN32)
   target_compile_definitions(TheBlackWall PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN)
 else()
   target_link_libraries(TheBlackWall PRIVATE m)
+  # Xlib directly, for drawing inside XScreenSaver's window (platform_linux.c).
+  # SDL itself loads X11, Wayland and GL at run time.
+  find_package(X11 REQUIRED)
+  target_link_libraries(TheBlackWall PRIVATE X11::X11)
   set_target_properties(TheBlackWall PROPERTIES OUTPUT_NAME theblackwall)
+  if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    target_link_options(TheBlackWall PRIVATE $<$<CONFIG:Release>:-s>)
+  endif()
   include(GNUInstallDirs)
-  # XScreenSaver looks for hacks in its libexec dir and their config in share.
+  # XScreenSaver looks for hacks in its hack directory and their settings
+  # pages in its config directory. Distributions disagree on the first
+  # (Debian, Ubuntu, Fedora: libexec/xscreensaver; Arch: lib/xscreensaver);
+  # tools/install-linux.sh finds the right one and passes it in.
   set(BW_XSS_HACKDIR "${CMAKE_INSTALL_LIBEXECDIR}/xscreensaver" CACHE PATH "XScreenSaver hack directory")
   set(BW_XSS_CONFDIR "${CMAKE_INSTALL_DATADIR}/xscreensaver/config" CACHE PATH "XScreenSaver config directory")
   install(TARGETS TheBlackWall RUNTIME DESTINATION ${BW_XSS_HACKDIR})

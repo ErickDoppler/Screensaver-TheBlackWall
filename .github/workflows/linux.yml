@@ -1,0 +1,103 @@
+name: Linux
+
+on:
+  push:
+    branches: [main, linux-version-build]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # The documented three steps on Ubuntu, then the result run for real:
+  # headless under Xvfb, and inside a live XScreenSaver.
+  ubuntu:
+    name: Ubuntu ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        # 22.04 has XScreenSaver 5.45, 24.04 has 6.x; -arm takes the aarch64
+        # downloads.
+        os: [ubuntu-22.04, ubuntu-24.04, ubuntu-24.04-arm]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: 1. Get the build tools
+        run: ./1-downloads-tools.sh
+
+      - name: 2. Build the screensaver
+        run: ./2-build-for-linux.sh
+
+      - name: Test dependencies
+        run: |
+          sudo apt-get install -y -q --no-install-recommends \
+            xvfb xauth x11-apps x11-utils mesa-utils libgl1-mesa-dri \
+            imagemagick libxml2-utils procps \
+            xscreensaver xscreensaver-data xscreensaver-gl
+          xmllint --noout res/linux/theblackwall.xml
+
+      - name: Headless smoke tests
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: xvfb-run -a -s "-screen 0 1280x720x24" .github/scripts/linux-smoke.sh
+
+      - name: 3. Install, then run inside XScreenSaver
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: xvfb-run -a -s "-screen 0 1280x720x24" .github/scripts/xscreensaver-e2e.sh
+
+      - name: Uninstall
+        run: |
+          tools/install-linux.sh --uninstall
+          # (a "!" command never fails a bash -e step, hence the if/exit)
+          if grep -q theblackwall ~/.xscreensaver; then exit 1; fi
+          if ls /usr/libexec/xscreensaver/theblackwall /usr/lib/xscreensaver/theblackwall 2>/dev/null; then exit 1; fi
+
+      - name: Keep the binary, screenshots and logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: theblackwall-${{ matrix.os }}
+          path: |
+            build/linux/theblackwall
+            out/
+          if-no-files-found: warn
+
+  # The package-manager branches of 1-downloads-tools.sh on other
+  # distributions (as root, the way a container runs it), and a build.
+  distros:
+    name: ${{ matrix.image }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    container: ${{ matrix.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [fedora:latest, archlinux:latest, opensuse/tumbleweed:latest, debian:stable]
+    steps:
+      - name: Tools the checkout needs
+        run: |
+          if   command -v dnf    >/dev/null; then dnf install -y git tar bash findutils
+          elif command -v pacman >/dev/null; then pacman -Sy --noconfirm git tar
+          elif command -v zypper >/dev/null; then zypper --non-interactive install git tar gzip bash findutils
+          elif command -v apt-get >/dev/null; then apt-get update -q && apt-get install -y -q git
+          fi
+
+      - uses: actions/checkout@v7
+
+      - name: 1. Get the build tools
+        run: ./1-downloads-tools.sh
+
+      - name: 2. Build the screensaver
+        run: ./2-build-for-linux.sh
+
+      - name: Check the binary
+        run: |
+          file build/linux/theblackwall 2>/dev/null || true
+          ldd build/linux/theblackwall
+          # every library resolves, and SDL is linked in rather than loaded
+          if ldd build/linux/theblackwall | grep -q 'not found'; then exit 1; fi
+          if ldd build/linux/theblackwall | grep -qi 'libSDL'; then exit 1; fi

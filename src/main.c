@@ -6,6 +6,12 @@
  *   /c[:<hwnd>]   show the settings dialog          (also: no arguments)
  *   /a <hwnd>     change password (legacy, ignored)
  *
+ * XScreenSaver (Linux) launches a hack with one of:
+ *   --root              draw into $XSCREENSAVER_WINDOW (the saver's window);
+ *                       without it, run fullscreen like -s
+ *   --window-id <id>    draw into that window (the settings dialog preview)
+ * With no mode at all the Linux build opens a window, as /w does.
+ *
  * Developer extras (any platform):
  *   /w | --window [WxH]     run in a resizable window
  *   --dump <file.png> --frames <n>   render n frames, save the last one, exit
@@ -28,6 +34,18 @@ static void *parse_hwnd(const char *text) {
     if (v == 0) v = strtoull(text, NULL, 16);
     return (void *)(uintptr_t)v;
 }
+
+#ifndef _WIN32
+/* X11 window ids come as "0x2c00001" or in decimal, as in XScreenSaver's
+ * vroot.h. Returns NULL for anything else. */
+static void *parse_xid(const char *text) {
+    if (!text || !*text) return NULL;
+    char *end;
+    unsigned long long v = strtoull(text, &end, 0);
+    while (*end == ' ') end++;
+    return *end ? NULL : (void *)(uintptr_t)v;
+}
+#endif
 
 int main(int argc, char **argv) {
     AppConfig cfg;
@@ -70,6 +88,21 @@ int main(int argc, char **argv) {
             }
             continue;
         }
+#ifndef _WIN32
+        if (!strcmp(opt, "root")) {
+            cfg.parent_hwnd = parse_xid(getenv("XSCREENSAVER_WINDOW"));
+            cfg.mode = cfg.parent_hwnd ? MODE_EMBEDDED : MODE_FULLSCREEN;
+            mode_given = 1;
+            continue;
+        }
+        if (!strcmp(opt, "window-id") && i + 1 < argc) {
+            cfg.parent_hwnd = parse_xid(argv[++i]);
+            if (!cfg.parent_hwnd) { plat_log("bad window id: %s", argv[i]); return 1; }
+            cfg.mode = MODE_EMBEDDED;
+            mode_given = 1;
+            continue;
+        }
+#endif
         if (!strcmp(opt, "window")) {
             cfg.mode = MODE_WINDOW; mode_given = 1;
             if (i + 1 < argc && isdigit((unsigned char)argv[i + 1][0])) {
