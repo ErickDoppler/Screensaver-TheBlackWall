@@ -1,15 +1,69 @@
 # The Black Wall
 
+![The wall stretching away along the floor](docs/screenshot-infinite.png)
+
 An atmospheric, energy-efficient 3D screensaver inspired by the Blackwall of
 Cyberpunk 2077: an endless wall of glowing pixels standing on a dark floor in
 empty space. The wall stretches to infinity left and right and fades away
 upward. It breathes with your machine: CPU load tightens its wave, network
 traffic pushes spikes through it.
 
-Status: **Windows 1.0, stable.** **Linux (XScreenSaver): new.** It builds on
-Ubuntu 22.04 and 24.04 (x86-64 and Arm64), Debian, Fedora, Arch and
-openSUSE, and renders under Ubuntu; the tests of drawing inside
-XScreenSaver's window are still being brought up in CI.
+**Status.** Windows: 1.0, stable. Linux (XScreenSaver): new. It builds on
+Ubuntu 22.04 and 24.04 (x86-64 and Arm64), Debian, Fedora, Arch and openSUSE,
+and renders and embeds in other programs' windows under Ubuntu; the
+end-to-end test with a live XScreenSaver is still being brought up in CI.
+
+## What you see
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshot-calm.png" alt="A calm wall"><br>
+      <sub>An idle machine: the wall barely breathes.</sub></td>
+    <td width="50%"><img src="docs/screenshot-heavy-traffic.png" alt="Spikes in the wall"><br>
+      <sub>Heavy network traffic pushes spikes through it.</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshot-figure.png" alt="A yellow figure ahead"><br>
+      <sub>Every 100 m a figure fades in ahead. AIs are yellow.</sub></td>
+    <td><img src="docs/screenshot-ghost.png" alt="A blue figure"><br>
+      <sub>Humans are blue.</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshot-alt.png" alt="Alt in front of the wall"><br>
+      <sub>Alt, an engram, stands 15 m tall.</sub></td>
+    <td><img src="docs/screenshot-ghost-wave.png" alt="The wall rising as a wave"><br>
+      <sub>Come within 10 m and the wall rises as a wave to take the figure.</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshot-scar.png" alt="A figure burnt into the wall"><br>
+      <sub>Its shadow stays burnt into the wall, then dissolves into static.</sub></td>
+    <td><img src="docs/screenshot-city.png" alt="A blue city skyline"><br>
+      <sub>Turn around: a distant city on the opposite horizon.</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshot-far-back.png" alt="The wall far away"><br>
+      <sub>Step back down the corridor, up to 1 km.</sub></td>
+    <td><img src="docs/screenshot-tv-off.png" alt="Black screen with faint lines"><br>
+      <sub>At 999 m the screen switches off, leaving faint CCTV lines.</sub></td>
+  </tr>
+</table>
+
+**Figures.** Every 100 m of travel along the wall a character from
+Cyberpunk 2077 slowly fades in 36 m ahead, standing 10 m from the wall. Come
+within 10 m and the wall rises as a giant wave and swallows it, leaving its
+shadow burnt into the wall, which then dissolves into sparkling static. Seven
+figures (Johnny, Alt, Songbird, Brendan, Skippy, David, Jackie) are built from
+the GLB models in `res/models`, colored by nature: engrams crimson, half-human
+gold, AIs yellow, humans blue. The **Show ghosts** option turns them off.
+Each figure's facing is set once in the pose tool (**Position the ghosts...**
+in the Windows dialog, or `--window --pose`): Up/Down pick the figure,
+Left/Right rotate it in 45-degree steps, Enter saves, Esc cancels.
+
+**The corridor.** You can step back up to 1 km from the wall. Beyond 50 m it
+looms taller, figures appear at your depth and the wave comes all the way out
+to take them. From 900 m the picture picks up static, from 970 m it breaks up
+like a damaged video, and at 999 m the screen switches off, leaving faint
+CCTV lines. Walk back toward the wall and the picture returns.
 
 ## Run it
 
@@ -44,8 +98,8 @@ except the screensaver itself, and Visual Studio is not needed.
 To look at it before installing, run `build\win-mingw\TheBlackWall.scr /w`
 for a window or `/s` for fullscreen; `Esc` always exits.
 
-A ready-made `TheBlackWall.scr` is also attached to each
-[release](https://github.com/ErickDoppler/Screensaver-TheBlackWall/releases).
+To skip building, download `TheBlackWall.scr` from the
+[releases page](https://github.com/ErickDoppler/Screensaver-TheBlackWall/releases).
 
 ### Linux
 
@@ -55,7 +109,7 @@ dnf, pacman and zypper (Debian, Ubuntu, Fedora, Arch, openSUSE) on x86-64 and
 Arm64.
 
 1. **Get the build tools.** Installs a C compiler and the X11, Wayland and
-   OpenGL development headers with your package manager (it asks for your
+   OpenGL development files with your package manager (it asks for your
    password), then downloads CMake, Ninja and the SDL3 source into
    `~/workenv`, checking every archive against a pinned SHA-256. Run it once;
    running it again only verifies what is already there.
@@ -66,9 +120,8 @@ Arm64.
 
 2. **Build the screensaver.** Produces `build/linux/theblackwall`, a single
    executable with SDL3 built in; at run time it needs only libc, libX11 and
-   libGL, which every desktop has.
-   Takes a couple of minutes the first time, because SDL3 is compiled from
-   source.
+   libGL, which every desktop has. Takes a couple of minutes the first time,
+   because SDL3 is compiled from source.
 
    ```sh
    ./2-build-for-linux.sh
@@ -85,21 +138,21 @@ Arm64.
    ```
 
    If XScreenSaver is not installed or not running, the script says how to
-   get it going (`sudo apt install xscreensaver xscreensaver-gl`, then
-   `xscreensaver --no-splash &`). Timeout and options are then in
+   get it going (for example `sudo apt install xscreensaver xscreensaver-gl`,
+   then `xscreensaver --no-splash &`). The timeout and options are then in
    `xscreensaver-settings`.
 
 To look at it before installing, run `build/linux/theblackwall --window` for
 a window or `-s` for fullscreen; `Esc` always exits.
 
-XScreenSaver only blanks X11 sessions, and GNOME and KDE run their own
-screen lockers instead of it unless you turn those off. On Wayland, or
-without XScreenSaver, the binary still runs fullscreen with `-s`.
+XScreenSaver only blanks X11 sessions, and GNOME and KDE run their own screen
+lockers instead of it unless you turn those off. On Wayland, or without
+XScreenSaver, the binary still runs fullscreen with `-s`.
 
 ## Build options (Windows)
 
-The two numbered scripts above are the whole story for a normal build; this
-section is for when you want something other than a plain Release build.
+The numbered scripts above are all a normal build needs; this section is for
+anything other than a plain Release build.
 
 `2-build-for-win64.cmd` takes `debug` (symbols, into
 `build\win-mingw-debug`) and `clean` (discard the build folder first). Set
@@ -127,10 +180,10 @@ choose **Install**.
 
 ## Build and install options (Linux)
 
-`1-downloads-tools.sh [dir] [--force] [--no-packages]`: install the toolchain
-into `dir` instead of `~/workenv` (or set `BW_WORKENV`); `--force` unpacks
-again; `--no-packages` skips the package manager when you already have a
-compiler, `pkg-config`, `curl`, `unzip` and the X11 and OpenGL development
+`1-downloads-tools.sh [dir] [--force] [--no-packages]`: installs the
+toolchain into `dir` instead of `~/workenv` (or set `BW_WORKENV`); `--force`
+unpacks again; `--no-packages` skips the package manager when you already have
+a compiler, `pkg-config`, `curl`, `unzip` and the X11 and OpenGL development
 files.
 
 `2-build-for-linux.sh [debug] [clean]`: `debug` builds with symbols into
@@ -142,9 +195,9 @@ otherwise (CMake 3.25 or newer).
 
 | Option          | Effect |
 |-----------------|--------|
-| `--user`        | no sudo: installs into `~/.local/libexec/theblackwall`. XScreenSaver runs it, but its settings page needs the system-wide install, so options then come from `settings.conf` (see below). |
-| `--no-activate` | add it to the list without making it the only screensaver; the current selection stays on the same hack |
-| `--uninstall`   | remove the files and the entry in `~/.xscreensaver` |
+| `--user`        | No sudo: installs into `~/.local/libexec/theblackwall`. XScreenSaver runs it, but the settings page needs the system-wide install, so options come from `settings.conf` (see [Settings](#settings)). |
+| `--no-activate` | Adds it to the list without making it the only screensaver; the current selection stays on the same one. |
+| `--uninstall`   | Removes the files and the entry in `~/.xscreensaver`. |
 
 By hand:
 
@@ -170,9 +223,10 @@ scans; behavioural detections on first run are still possible. If it
 happens:
 
 1. Report it as a false positive at
-   https://www.microsoft.com/wdsi/filesubmission (choose "Software developer"),
-   attaching `TheBlackWall.scr`. Microsoft usually clears it within a day or
-   two and the fix reaches everyone through the definition updates.
+   <https://www.microsoft.com/wdsi/filesubmission> (choose "Software
+   developer"), attaching `TheBlackWall.scr`. Microsoft usually clears it
+   within a day or two, and the fix reaches everyone through the definition
+   updates.
 2. Meanwhile, restore the file from Defender's protection history and add
    an exclusion for the install folder (`%LOCALAPPDATA%\TheBlackWall`).
 3. Code-signing the `.scr` with a certificate from a public CA removes the
@@ -198,7 +252,7 @@ XScreenSaver calls it the way it calls its own hacks:
 
 With no switch at all, the Linux build opens a window.
 
-Developer switches:
+Developer switches (both platforms):
 
 | Switch                          | Meaning                                          |
 |---------------------------------|--------------------------------------------------|
@@ -206,62 +260,59 @@ Developer switches:
 | `--dump out.png --frames 90`    | render 90 frames, save the last one, exit        |
 | `--cpu 0.8` / `--net 20000000`  | fake CPU load (0..1) / network bits per second   |
 | `--log file.txt`                | append diagnostics to a file                     |
+| `--pose`                        | the figure positioning tool, in a window         |
+| `--model <n>`                   | the figure the pose tool starts with             |
+| `--yaw 180`                     | start facing away from the wall                  |
+| `--back 300`                    | start 300 m from the wall                        |
+| `--figure-every <metres>`       | spacing of the figures (`-1` summons one at once) |
 | `--<setting> <value>`           | override any setting for this run, e.g. `--density 80 --pixel-type matrix --wall-color #ff3b1f` |
+
+At configure time, `-DBW_MODEL_POINTS=<n>` changes how many points are kept
+per figure model (default 40000). `tools/make_icon.py` regenerates the icon.
+
+### Settings
 
 Setting keys: `side-movement`, `movement-speed`, `mouse-rotation`,
 `exit-on-mouse-move`, `mouse-sensitivity`, `click-resets-view`,
 `exit-on-any-key`, `density`, `pixel-size` (the dot itself, from about
-2 x 2 screen pixels up to a chunky LED), `blur`, `ghost-tail`,
-`shimmer` (0 = smooth, 100 = pixels flicker as if tearing off),
-`pixel-type` (square/round/matrix), `horizon` (distant city, default on),
+2 x 2 screen pixels up to a chunky LED), `blur`, `ghost-tail`, `shimmer`
+(0 = smooth, 100 = pixels flicker as if tearing off), `pixel-type`
+(square/round/matrix), `horizon` (distant city, default on), `show-ghosts`,
 `fps` (10..120, default 60), `wall-color`, `floor-color`, `space-color`,
 `horizon-color` (default blue).
-Settings persist in `HKCU\Software\TheBlackWall` on Windows. On Linux they
-are read from `~/.config/theblackwall/settings.conf` (`$XDG_CONFIG_HOME`),
-one `key = value` per line with the keys above: numbers in decimal (switches
-0 or 1, `pixel-type` 0 square, 1 round, 2 matrix) and colors as `#RRGGBB`
-(e.g. `wall-color = #ff3b1f`). The options XScreenSaver passes override them.
 
-**Figures.** Every 100 m of travel along the wall a character from
-Cyberpunk 2077 slowly fades in 36 m ahead, standing 10 m from the wall; come
-within 10 m and the wall rises as a giant wave and swallows it, leaving its
-shadow burnt into the wall, which then dissolves into sparkling static.
-By default the mouse looks around and the keys move the camera.
-Seven figures (Johnny, Alt, Songbird, Brendan, Skippy, David, Jackie) are
-built from the GLB models in `res/models`, colored by nature: engrams
-crimson, half-human gold, AIs yellow, humans blue. The **Show ghosts**
-checkbox turns them off. Each figure's facing is set once in the pose tool
-(**Position the ghosts...** in the dialog, or `/w --pose`): Up/Down pick the
-figure, Left/Right rotate it in 45-degree steps, Enter saves, Esc cancels.
+On Windows, settings persist in `HKCU\Software\TheBlackWall` and are edited
+in the settings dialog.
 
-**The corridor.** You can step back up to 1 km from the wall. Beyond 50 m it
-looms taller, figures appear at your depth and the wave comes all the way out
-to take them. From 900 m the picture picks up static, from 970 m it breaks up
-like a damaged video, and at 999 m the screen switches off, leaving faint
-CCTV lines. Walk back toward the wall and the picture returns.
+On Linux, XScreenSaver passes the options from its settings page on the
+command line. Anything else is read from
+`~/.config/theblackwall/settings.conf` (under `$XDG_CONFIG_HOME` if set), one
+`key = value` per line: numbers in decimal (switches 0 or 1; `pixel-type` 0
+square, 1 round, 2 matrix) and colors as `#RRGGBB`, for example:
 
-More developer switches: `--yaw 180` starts the camera facing away from the
-wall; `--back 300` starts the camera 300 m from the wall; `--figure-every <metres>` changes the spacing of the figures (`-1`
-summons one at once); `--model <n>` picks the figure the pose tool starts
-with. `-DBW_MODEL_POINTS=<n>` at configure time changes how many points are
-kept per model (default 40000). `tools/make_icon.py` regenerates the icon.
+```ini
+density = 80
+wall-color = #ff3b1f
+```
 
 ## Controls
 
-When **Exit on any button** is off, the keyboard steers the camera:
+In a window, and fullscreen when **Exit on any button** is off, the mouse
+looks around and the keyboard steers the camera. Inside XScreenSaver the
+keyboard and mouse belong to XScreenSaver, which unblanks on any input.
 
-| Key                  | Action                            |
-|----------------------|-----------------------------------|
-| Up/Down or W/S, wheel| move forward / back along the view direction |
-| Left/Right or A/D    | strafe left / right relative to the view     |
-| Shift + movement     | three times faster                |
-| Ctrl                 | crouch, at half speed (overrides Shift) |
-| Space                | jump, half a metre up             |
-| PageUp/PageDown, Q/E | standing height                   |
-| J/L, I/K             | yaw, pitch                        |
-| T                    | toggle side movement              |
-| Home or R            | reset the view                    |
-| Esc                  | exit (always)                     |
+| Key                   | Action                                       |
+|-----------------------|----------------------------------------------|
+| Up/Down or W/S, wheel | move forward / back along the view direction |
+| Left/Right or A/D     | strafe left / right relative to the view     |
+| Shift + movement      | three times faster                           |
+| Ctrl                  | crouch, at half speed (overrides Shift)      |
+| Space                 | jump, half a metre up                        |
+| PageUp/PageDown, Q/E  | standing height                              |
+| J/L, I/K              | yaw, pitch                                   |
+| T                     | toggle side movement                         |
+| Home or R             | reset the view                               |
+| Esc                   | exit (always)                                |
 
 Touch any control and the screensaver lets go: the automatic drift along the
 wall stops and the view stays where you put it. Both come back after 20
@@ -287,7 +338,7 @@ res/linux/      XScreenSaver settings page
 res/models/     figure models, turned into point tables at build time
 cmake/          toolchain file + shader embedding script
 tools/          env / build / install helpers, model converter
-docs/           design and tooling notes
+docs/           design and tooling notes, screenshots
 third_party/    stb_image_write.h (public domain), cgltf.h (MIT)
 .github/        Linux CI: build on Ubuntu and other distributions, then run
                 it headless and inside a live XScreenSaver
