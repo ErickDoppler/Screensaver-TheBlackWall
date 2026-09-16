@@ -10,7 +10,7 @@ mkdir -p "$OUT"
 # Keep software rendering quick; also exercises the settings file.
 export XDG_CONFIG_HOME="$PWD/$OUT/config"
 mkdir -p "$XDG_CONFIG_HOME/theblackwall"
-printf 'density = 30\nfps = 30\n' > "$XDG_CONFIG_HOME/theblackwall/settings.conf"
+printf 'density = 80\nfps = 30\n' > "$XDG_CONFIG_HOME/theblackwall/settings.conf"
 
 step() { printf '\n=== %s\n' "$*"; }
 die()  { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
@@ -64,17 +64,22 @@ step "window mode renders the wall"
 timeout 120 "$BIN" --window 640x360 --dump "$OUT/window.png" --frames 30 --log "$OUT/window.log"
 cat "$OUT/window.log"
 grep -q "start: mode=2 640x360" "$OUT/window.log" || die "unexpected start line"
-grep -q "density=30" "$OUT/window.log" || die "settings.conf was not read"
+grep -q "density=80" "$OUT/window.log" || die "settings.conf was not read"
 is_wall "$OUT/window.png" || die "window.png does not show the wall"
 
 step "a #RRGGBB color in settings.conf is applied"
 cp "$XDG_CONFIG_HOME/theblackwall/settings.conf" "$OUT/settings.saved"
 printf 'wall-color = #20ff20\n' >> "$XDG_CONFIG_HOME/theblackwall/settings.conf"
 timeout 120 "$BIN" --window 640x360 --dump "$OUT/green.png" --frames 30
+# The floor stays dark red whatever the wall color, so compare with the red
+# run above rather than with a fixed ratio: green must rise and red fall.
+g0="$($IM "$OUT/window.png" -format '%[fx:mean.g]' info:)"
+r0="$($IM "$OUT/window.png" -format '%[fx:mean.r]' info:)"
 g="$($IM "$OUT/green.png" -format '%[fx:mean.g]' info:)"
 r="$($IM "$OUT/green.png" -format '%[fx:mean.r]' info:)"
-echo "  mean green $g, red $r"
-awk -v r="$r" -v g="$g" 'BEGIN { exit !(g > 0.01 && g > 2 * r) }' || die "the wall is not green"
+echo "  red wall: green $g0, red $r0;  green wall: green $g, red $r"
+awk -v g0="$g0" -v r0="$r0" -v g="$g" -v r="$r" \
+    'BEGIN { exit !(g > 1.5 * g0 && g > 0.01 && r < 0.9 * r0) }' || die "the wall did not turn green"
 cp "$OUT/settings.saved" "$XDG_CONFIG_HOME/theblackwall/settings.conf"
 
 # ---------------------------------------------------------------------------
