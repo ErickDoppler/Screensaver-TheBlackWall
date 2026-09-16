@@ -67,6 +67,16 @@ grep -q "start: mode=2 640x360" "$OUT/window.log" || die "unexpected start line"
 grep -q "density=30" "$OUT/window.log" || die "settings.conf was not read"
 is_wall "$OUT/window.png" || die "window.png does not show the wall"
 
+step "a #RRGGBB color in settings.conf is applied"
+cp "$XDG_CONFIG_HOME/theblackwall/settings.conf" "$OUT/settings.saved"
+printf 'wall-color = #20ff20\n' >> "$XDG_CONFIG_HOME/theblackwall/settings.conf"
+timeout 120 "$BIN" --window 640x360 --dump "$OUT/green.png" --frames 30
+g="$($IM "$OUT/green.png" -format '%[fx:mean.g]' info:)"
+r="$($IM "$OUT/green.png" -format '%[fx:mean.r]' info:)"
+echo "  mean green $g, red $r"
+awk -v r="$r" -v g="$g" 'BEGIN { exit !(g > 0.01 && g > 2 * r) }' || die "the wall is not green"
+cp "$OUT/settings.saved" "$XDG_CONFIG_HOME/theblackwall/settings.conf"
+
 # ---------------------------------------------------------------------------
 step "--window-id draws inside another program's window"
 start_parent

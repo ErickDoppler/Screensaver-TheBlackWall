@@ -63,10 +63,17 @@ static void store_load(void) {
     if (!f) return;
     char line[256];
     while (g_store_n < STORE_MAX && fgets(line, sizeof line, f)) {
-        char key[48];
-        long value;
+        char key[48], text[64];
         if (line[0] == '#') continue;
-        if (sscanf(line, " %47[A-Za-z0-9_-] = %ld", key, &value) != 2) continue;
+        if (sscanf(line, " %47[A-Za-z0-9_-] = %63s", key, text) != 2) continue;
+        /* decimal, or a color written as #RRGGBB / 0xRRGGBB */
+        const char *digits = text;
+        int base = 10;
+        if (text[0] == '#') { digits = text + 1; base = 16; }
+        else if (text[0] == '0' && (text[1] == 'x' || text[1] == 'X')) { digits = text + 2; base = 16; }
+        char *end;
+        long value = strtol(digits, &end, base);
+        if (end == digits || *end) continue;
         memcpy(g_store[g_store_n].key, key, sizeof key);
         g_store[g_store_n].value = (int)value;
         g_store_n++;
@@ -141,9 +148,10 @@ static int read_cpu(uint64_t *busy, uint64_t *total) {
 /* A real adapter has a device behind it in sysfs; loopback, bridges, veth,
  * tun and the like do not. */
 static int is_hardware_if(const char *name) {
-    char path[256];
+    char path[64];
     struct stat st;
-    snprintf(path, sizeof path, "/sys/class/net/%s/device", name);
+    /* interface names are at most 15 characters (IFNAMSIZ - 1) */
+    snprintf(path, sizeof path, "/sys/class/net/%.15s/device", name);
     return stat(path, &st) == 0;
 }
 

@@ -75,16 +75,21 @@ as_root() {
     fi
 }
 
-# Required packages must install; optional ones (extra SDL backends: Wayland,
-# XInput, window decorations...) are added where the distribution has them.
+# Required packages must install: the compiler, and the X11 and OpenGL
+# development files the screensaver links against. Optional ones (the extra
+# SDL backends: Wayland, XInput, window decorations...) are added where the
+# distribution has them.
 install_apt() {
+    as_root env DEBIAN_FRONTEND=noninteractive apt-get update -q
+    # libgl-dev is the libglvnd-era name (Debian 10, Ubuntu 20.04 and later)
+    local gl=libgl-dev
+    apt-cache show libgl-dev >/dev/null 2>&1 || gl=libgl1-mesa-dev
     local req=(build-essential pkg-config curl ca-certificates unzip tar
-               libx11-dev libxext-dev)
+               libx11-dev libxext-dev "$gl")
     local opt=(libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev
-               libxtst-dev libxkbcommon-dev libgl-dev libegl-dev libwayland-dev
+               libxtst-dev libxkbcommon-dev libegl-dev libwayland-dev
                wayland-protocols libdecor-0-dev libdbus-1-dev libudev-dev
                libdrm-dev libgbm-dev)
-    as_root env DEBIAN_FRONTEND=noninteractive apt-get update -q
     local have=() p
     for p in "${opt[@]}"; do
         if apt-cache show "$p" >/dev/null 2>&1; then have+=("$p"); fi
@@ -94,10 +99,11 @@ install_apt() {
 }
 
 install_dnf() {
-    local req=(gcc make pkgconf-pkg-config curl tar unzip libX11-devel libXext-devel)
+    local req=(gcc make pkgconf-pkg-config curl tar unzip libX11-devel libXext-devel
+               mesa-libGL-devel)
     local opt=(libXrandr-devel libXcursor-devel libXfixes-devel libXi-devel
                libXScrnSaver-devel libXtst-devel libxkbcommon-devel
-               mesa-libGL-devel mesa-libEGL-devel wayland-devel
+               mesa-libEGL-devel wayland-devel
                wayland-protocols-devel libdecor-devel dbus-devel systemd-devel
                libdrm-devel mesa-libgbm-devel)
     as_root dnf install -y "${req[@]}"
@@ -112,13 +118,14 @@ install_dnf() {
 install_pacman() {
     as_root pacman -S --needed --noconfirm base-devel curl tar unzip \
         libx11 libxext libxrandr libxcursor libxfixes libxi libxss libxtst \
-        libxkbcommon mesa wayland wayland-protocols libdecor
+        libxkbcommon libglvnd mesa wayland wayland-protocols libdecor
 }
 
 install_zypper() {
-    local req=(gcc make pkg-config curl tar unzip libX11-devel libXext-devel)
+    local req=(gcc make pkg-config curl tar unzip libX11-devel libXext-devel
+               Mesa-libGL-devel)
     local opt=(libXrandr-devel libXcursor-devel libXfixes-devel libXi-devel
-               libXss-devel libXtst-devel libxkbcommon-devel Mesa-libGL-devel
+               libXss-devel libXtst-devel libxkbcommon-devel
                Mesa-libEGL-devel wayland-devel wayland-protocols-devel
                libdrm-devel libgbm-devel dbus-1-devel)
     as_root zypper --non-interactive install --no-recommends "${req[@]}"
@@ -135,7 +142,7 @@ if [ "$PACKAGES" -eq 1 ]; then
     elif command -v pacman  >/dev/null 2>&1; then install_pacman
     elif command -v zypper  >/dev/null 2>&1; then install_zypper
     else fail "no supported package manager (apt, dnf, pacman, zypper). Install a C compiler,
-        pkg-config, curl, unzip and the X11 development headers yourself, then
+        pkg-config, curl, unzip and the X11 and OpenGL development files yourself, then
         run again with --no-packages."
     fi
     ok "packages installed"
@@ -221,7 +228,8 @@ command -v "$CC_BIN" >/dev/null 2>&1 || fail "no C compiler ($CC_BIN) found"
 command -v cmake >/dev/null 2>&1     || fail "cmake not found"
 command -v ninja >/dev/null 2>&1     || fail "ninja not found"
 command -v pkg-config >/dev/null 2>&1 || fail "pkg-config not found"
-pkg-config --exists x11 || fail "the X11 development headers are missing (libx11-dev / libX11-devel)"
+pkg-config --exists x11 || fail "the X11 development files are missing (libx11-dev / libX11-devel)"
+pkg-config --exists gl  || fail "the OpenGL development files are missing (libgl-dev / mesa-libGL-devel)"
 [ -f "$D_SDL/CMakeLists.txt" ] || fail "SDL3 source is incomplete"
 
 cmake_ver="$(cmake --version | head -n1 | awk '{print $3}')"
@@ -233,7 +241,7 @@ fi
 say "  $("$CC_BIN" --version | head -n1)"
 say "  cmake version $cmake_ver"
 say "  ninja $(ninja --version)"
-say "  libX11 $(pkg-config --modversion x11)"
+say "  libX11 $(pkg-config --modversion x11), libGL $(pkg-config --modversion gl)"
 say "  SDL3 $V_SDL source at $D_SDL"
 echo
 say "Done. The archives are kept in $DOWNLOADS so the environment can be"

@@ -140,9 +140,13 @@ if(WIN32)
 else()
   target_link_libraries(TheBlackWall PRIVATE m)
   # Xlib directly, for drawing inside XScreenSaver's window (platform_linux.c).
-  # SDL itself loads X11, Wayland and GL at run time.
   find_package(X11 REQUIRED)
-  target_link_libraries(TheBlackWall PRIVATE X11::X11)
+  # The GL 1.1 entry points come from libGL, as they come from opengl32 on
+  # Windows (see gl_loader.h). libGL is also what SDL loads for GLX, so both
+  # dispatch to the same context.
+  set(OpenGL_GL_PREFERENCE LEGACY)
+  find_package(OpenGL REQUIRED)
+  target_link_libraries(TheBlackWall PRIVATE X11::X11 OpenGL::GL)
   set_target_properties(TheBlackWall PROPERTIES OUTPUT_NAME theblackwall)
   if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_link_options(TheBlackWall PRIVATE $<$<CONFIG:Release>:-s>)
