@@ -36,5 +36,8 @@ int   plat_x11_window_size(unsigned long win, int *w, int *h);
 int   plat_x11_embed(unsigned long child, unsigned long parent);
 /* 1 once the embedded window has been destroyed (with its parent). */
 int   plat_x11_embed_lost(void);
+/* Ends the process at once (status 0) if the embedded window is gone, when
+ * there is nothing left to tear down; otherwise returns. */
+void  plat_x11_embed_finish(void);
 #endif
 #endif

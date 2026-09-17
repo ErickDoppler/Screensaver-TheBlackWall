@@ -3,12 +3,14 @@
 #define _POSIX_C_SOURCE 200809L
 #include <X11/Xlib.h>
 #include <errno.h>
+#include <pthread.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 #include "platform.h"
 
@@ -276,6 +278,38 @@ static void on_fatal_signal(int sig) {
     raise(sig);
 }
 
+static void end_now(void) {
+    if (g_log) fflush(g_log);
+    fflush(stderr);
+    _exit(0);
+}
+
+/* Once the owner's window is gone, a frame that was already under way can
+ * block in the driver instead of failing (seen with llvmpipe on Arm), and so
+ * can tearing down a GL context bound to the vanished window. The main loop
+ * cannot notice either, so a thread with a connection of its own watches the
+ * owner's window and ends the process shortly after it disappears. SDL has
+ * already called XInitThreads, which makes the second connection safe. */
+static void *watch_parent(void *arg) {
+    (void)arg;
+    Display *d = XOpenDisplay(NULL);
+    if (!d) return NULL;
+    const struct timespec tick = { 0, 250000000 };     /* 0.25 s */
+    const struct timespec grace = { 1, 500000000 };    /* 1.5 s */
+    for (;;) {
+        XWindowAttributes attr;
+        if (!XGetWindowAttributes(d, (Window)g_embed_parent, &attr)) break;
+        nanosleep(&tick, NULL);
+    }
+    g_embed_lost = 1;
+    nanosleep(&grace, NULL);        /* room for the main loop to finish */
+    static const char msg[] = "theblackwall: exiting, the owner's window is gone\n";
+    ssize_t n = write(STDERR_FILENO, msg, sizeof msg - 1);
+    (void)n;
+    end_now();
+    return NULL;
+}
+
 int plat_x11_embed(unsigned long child, unsigned long parent) {
     Display *d = x_display();
     if (!d || !child || !parent) return 0;
@@ -296,9 +330,17 @@ int plat_x11_embed(unsigned long child, unsigned long parent) {
     sigemptyset(&sa.sa_mask);
     sigaction(SIGSEGV, &sa, NULL);
     sigaction(SIGBUS, &sa, NULL);
+    pthread_t watcher;
+    if (pthread_create(&watcher, NULL, watch_parent, NULL) == 0) pthread_detach(watcher);
     return 1;
 }
 
 int plat_x11_embed_lost(void) {
     return g_embed_lost;
+}
+
+void plat_x11_embed_finish(void) {
+    /* Nothing is left to tear down properly: the window our GL context
+     * draws into no longer exists. */
+    if (g_embed_lost) end_now();
 }

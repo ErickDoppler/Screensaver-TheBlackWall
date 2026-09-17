@@ -586,6 +586,11 @@ int app_run(const AppConfig *cfg) {
     plat_log("stop: %d frames in %.2f s (%.1f fps avg), cpu=%.2f net=%.0f bps, points/frame=%d",
              a.frames, a.elapsed, a.elapsed > 0.f ? a.frames / a.elapsed : 0.f,
              a.stats.cpu, a.stats.bps, a.r.points_drawn);
+#ifndef _WIN32
+    /* The owner's window, and ours with it, may be gone: then tearing down
+     * the GL context can block, and there is nothing to clean up anyway. */
+    if (cfg->mode == MODE_EMBEDDED) plat_x11_embed_finish();
+#endif
 
 done:
     render_shutdown(&a.r);
