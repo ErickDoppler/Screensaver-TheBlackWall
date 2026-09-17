@@ -8,10 +8,11 @@ empty space. The wall stretches to infinity left and right and fades away
 upward. It breathes with your machine: CPU load tightens its wave, network
 traffic pushes spikes through it.
 
-**Status.** Windows: 1.0, stable. Linux (XScreenSaver): new. It builds on
+**Status.** Windows: 1.0, stable. Linux (XScreenSaver): new. CI builds it on
 Ubuntu 22.04 and 24.04 (x86-64 and Arm64), Debian, Fedora, Arch and openSUSE,
-and renders and embeds in other programs' windows under Ubuntu; the
-end-to-end test with a live XScreenSaver is still being brought up in CI.
+and on Ubuntu installs it and runs it inside a live XScreenSaver (5.45 and
+6.08). All of that testing uses software OpenGL, so it has not yet been
+seen on real graphics hardware.
 
 ## Run it
 
