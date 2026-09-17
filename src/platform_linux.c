@@ -3,11 +3,14 @@
 #define _POSIX_C_SOURCE 200809L
 #include <X11/Xlib.h>
 #include <errno.h>
+#include <pthread.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 #include "platform.h"
 
@@ -195,6 +198,11 @@ int plat_stats_read(uint64_t *cpu_busy, uint64_t *cpu_total, uint64_t *net_bytes
 static Display *g_dpy;
 static int g_x_error;
 
+/* Set by plat_x11_embed: our window and the owner's. g_embed_lost becomes 1
+ * once either is known to be gone; it is read from a signal handler. */
+static unsigned long g_embedded, g_embed_parent;
+static volatile sig_atomic_t g_embed_lost;
+
 static int x_error_handler(Display *d, XErrorEvent *e) {
     (void)d;
     g_x_error = e->error_code ? e->error_code : 1;
@@ -227,7 +235,10 @@ int plat_x11_window_size(unsigned long win, int *w, int *h) {
     XWindowAttributes attr;
     XErrorFn prev = x_trap_begin(d);
     Status st = XGetWindowAttributes(d, (Window)win, &attr);
-    if (!x_trap_end(d, prev) || !st || attr.width <= 0 || attr.height <= 0) return 0;
+    if (!x_trap_end(d, prev) || !st || attr.width <= 0 || attr.height <= 0) {
+        if (win == g_embed_parent) g_embed_lost = 1;   /* ours went with it */
+        return 0;
+    }
     *w = attr.width;
     *h = attr.height;
     return 1;
@@ -238,9 +249,6 @@ int plat_x11_window_size(unsigned long win, int *w, int *h) {
  * connection, and Xlib's default handler would end the process on the spot.
  * This handler stays installed instead; it notes that the window is gone,
  * which the main loop checks every frame, and logs anything else. */
-static unsigned long g_embedded;
-static int g_embed_lost;
-
 static int x_embed_error_handler(Display *d, XErrorEvent *e) {
     (void)d;
     if ((e->error_code == BadWindow || e->error_code == BadDrawable) &&
@@ -252,6 +260,54 @@ static int x_embed_error_handler(Display *d, XErrorEvent *e) {
                  e->request_code, e->minor_code, (unsigned long)e->resourceid);
     }
     return 0;
+}
+
+/* Software OpenGL (Mesa's llvmpipe) does not survive the failed swap: it
+ * carries on with the drawable it could not query and crashes inside the
+ * same call. By then the window is known to be gone and there is nothing
+ * left to draw into, so that crash is turned into a normal exit. Any other
+ * crash keeps its default behaviour. */
+static void on_fatal_signal(int sig) {
+    if (g_embed_lost) {
+        static const char msg[] = "theblackwall: exiting, our window is gone\n";
+        ssize_t n = write(STDERR_FILENO, msg, sizeof msg - 1);
+        (void)n;
+        _exit(0);
+    }
+    signal(sig, SIG_DFL);
+    raise(sig);
+}
+
+static void end_now(void) {
+    if (g_log) fflush(g_log);
+    fflush(stderr);
+    _exit(0);
+}
+
+/* Once the owner's window is gone, a frame that was already under way can
+ * block in the driver instead of failing (seen with llvmpipe on Arm), and so
+ * can tearing down a GL context bound to the vanished window. The main loop
+ * cannot notice either, so a thread with a connection of its own watches the
+ * owner's window and ends the process shortly after it disappears. SDL has
+ * already called XInitThreads, which makes the second connection safe. */
+static void *watch_parent(void *arg) {
+    (void)arg;
+    Display *d = XOpenDisplay(NULL);
+    if (!d) return NULL;
+    const struct timespec tick = { 0, 250000000 };     /* 0.25 s */
+    const struct timespec grace = { 1, 500000000 };    /* 1.5 s */
+    for (;;) {
+        XWindowAttributes attr;
+        if (!XGetWindowAttributes(d, (Window)g_embed_parent, &attr)) break;
+        nanosleep(&tick, NULL);
+    }
+    g_embed_lost = 1;
+    nanosleep(&grace, NULL);        /* room for the main loop to finish */
+    static const char msg[] = "theblackwall: exiting, the owner's window is gone\n";
+    ssize_t n = write(STDERR_FILENO, msg, sizeof msg - 1);
+    (void)n;
+    end_now();
+    return NULL;
 }
 
 int plat_x11_embed(unsigned long child, unsigned long parent) {
@@ -266,10 +322,25 @@ int plat_x11_embed(unsigned long child, unsigned long parent) {
         return 0;
     }
     g_embedded = child;
+    g_embed_parent = parent;
     XSetErrorHandler(x_embed_error_handler);
+    struct sigaction sa;
+    memset(&sa, 0, sizeof sa);
+    sa.sa_handler = on_fatal_signal;
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIGSEGV, &sa, NULL);
+    sigaction(SIGBUS, &sa, NULL);
+    pthread_t watcher;
+    if (pthread_create(&watcher, NULL, watch_parent, NULL) == 0) pthread_detach(watcher);
     return 1;
 }
 
 int plat_x11_embed_lost(void) {
     return g_embed_lost;
+}
+
+void plat_x11_embed_finish(void) {
+    /* Nothing is left to tear down properly: the window our GL context
+     * draws into no longer exists. */
+    if (g_embed_lost) end_now();
 }

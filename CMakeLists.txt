@@ -146,7 +146,9 @@ else()
   # dispatch to the same context.
   set(OpenGL_GL_PREFERENCE LEGACY)
   find_package(OpenGL REQUIRED)
-  target_link_libraries(TheBlackWall PRIVATE X11::X11 OpenGL::GL)
+  # A watchdog thread follows XScreenSaver's window (platform_linux.c).
+  find_package(Threads REQUIRED)
+  target_link_libraries(TheBlackWall PRIVATE X11::X11 OpenGL::GL Threads::Threads)
   set_target_properties(TheBlackWall PROPERTIES OUTPUT_NAME theblackwall)
   if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_link_options(TheBlackWall PRIVATE $<$<CONFIG:Release>:-s>)

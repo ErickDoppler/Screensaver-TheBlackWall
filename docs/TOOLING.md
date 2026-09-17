@@ -86,7 +86,18 @@ installed.) Then run the build script.
 ## Continuous integration
 
 `.github/workflows/linux.yml` runs the three Linux steps on Ubuntu 22.04,
-24.04 and 24.04 Arm, then tests the result under Xvfb with software OpenGL
-(`.github/scripts/linux-smoke.sh`) and inside a live XScreenSaver
-(`.github/scripts/xscreensaver-e2e.sh`). Fedora, Arch, openSUSE Tumbleweed
-and Debian containers run the first two steps.
+24.04 and 24.04 Arm, then tests the result under Xvfb with software OpenGL,
+started by `.github/scripts/with-xvfb.sh`, which keeps the server's log:
+
+* `.github/scripts/linux-smoke.sh` renders in a window, checks that a color
+  from `settings.conf` is applied, draws inside a window owned by another
+  program (`.github/scripts/xparent.c`, a minimal Xlib client standing in
+  for XScreenSaver's), and checks that the process exits cleanly when that
+  window is destroyed, on SIGTERM, fullscreen, and with bad window ids.
+* `.github/scripts/xscreensaver-e2e.sh` installs with
+  `tools/install-linux.sh`, starts a real XScreenSaver (5.45 on 22.04, 6.x
+  on 24.04), blanks the screen, and checks that the wall is on screen inside
+  XScreenSaver's window and that the process ends when the screen unblanks.
+
+Fedora, Arch, openSUSE Tumbleweed and Debian containers run the first two
+steps. Screenshots and logs from every Ubuntu job are kept as artifacts.
