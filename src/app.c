@@ -42,7 +42,6 @@ typedef struct App {
     float       land_t;             /* when the last one came down */
     float       elapsed;            /* seconds since start */
     float       mouse_travel;       /* accumulated motion for exit-on-move */
-    float       parent_check_at;    /* MODE_EMBEDDED: next look at the owner's window */
     int         frames;
 } App;
 
@@ -505,18 +504,6 @@ int app_run(const AppConfig *cfg) {
         poll_events(&a);
 #ifdef _WIN32
         if (cfg->mode == MODE_PREVIEW && !plat_win32_window_alive(cfg->parent_hwnd)) break;
-#else
-        if (cfg->mode == MODE_EMBEDDED && plat_x11_embed_lost()) break;
-        if (cfg->mode == MODE_EMBEDDED && a.elapsed >= a.parent_check_at) {
-            /* Follow the owner's window: stop when it is gone (XScreenSaver
-             * normally sends SIGTERM first, which SDL turns into a quit) and
-             * track its size, which the settings preview may change. */
-            a.parent_check_at = a.elapsed + 0.5f;
-            int pw, ph, cw, ch;
-            if (!plat_x11_window_size((unsigned long)(uintptr_t)cfg->parent_hwnd, &pw, &ph)) break;
-            SDL_GetWindowSize(a.win, &cw, &ch);
-            if (pw != cw || ph != ch) SDL_SetWindowSize(a.win, pw, ph);
-        }
 #endif
         if (!a.running) break;
 
@@ -559,6 +546,20 @@ int app_run(const AppConfig *cfg) {
                      a.elapsed, a.cam.z);
         }
 
+#ifndef _WIN32
+        if (cfg->mode == MODE_EMBEDDED) {
+            /* Follow the owner's window, right before drawing into ours: once
+             * the owner's is gone, so is ours, and drawing would fail (see
+             * plat_x11_embed). XScreenSaver normally sends SIGTERM first,
+             * which SDL turns into a quit. Also track its size, which the
+             * settings preview may change. */
+            int pw, ph, cw, ch;
+            if (plat_x11_embed_lost() ||
+                !plat_x11_window_size((unsigned long)(uintptr_t)cfg->parent_hwnd, &pw, &ph)) break;
+            SDL_GetWindowSize(a.win, &cw, &ch);
+            if (pw != cw || ph != ch) SDL_SetWindowSize(a.win, pw, ph);
+        }
+#endif
         render_resize(&a.r, a.width, a.height);
         render_frame(&a.r, &eff, &a.sim, &a.cam, a.elapsed, dt);
         a.frames++;

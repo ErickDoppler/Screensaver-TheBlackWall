@@ -3,6 +3,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include <X11/Xlib.h>
 #include <errno.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -195,6 +196,11 @@ int plat_stats_read(uint64_t *cpu_busy, uint64_t *cpu_total, uint64_t *net_bytes
 static Display *g_dpy;
 static int g_x_error;
 
+/* Set by plat_x11_embed: our window and the owner's. g_embed_lost becomes 1
+ * once either is known to be gone; it is read from a signal handler. */
+static unsigned long g_embedded, g_embed_parent;
+static volatile sig_atomic_t g_embed_lost;
+
 static int x_error_handler(Display *d, XErrorEvent *e) {
     (void)d;
     g_x_error = e->error_code ? e->error_code : 1;
@@ -227,7 +233,10 @@ int plat_x11_window_size(unsigned long win, int *w, int *h) {
     XWindowAttributes attr;
     XErrorFn prev = x_trap_begin(d);
     Status st = XGetWindowAttributes(d, (Window)win, &attr);
-    if (!x_trap_end(d, prev) || !st || attr.width <= 0 || attr.height <= 0) return 0;
+    if (!x_trap_end(d, prev) || !st || attr.width <= 0 || attr.height <= 0) {
+        if (win == g_embed_parent) g_embed_lost = 1;   /* ours went with it */
+        return 0;
+    }
     *w = attr.width;
     *h = attr.height;
     return 1;
@@ -238,9 +247,6 @@ int plat_x11_window_size(unsigned long win, int *w, int *h) {
  * connection, and Xlib's default handler would end the process on the spot.
  * This handler stays installed instead; it notes that the window is gone,
  * which the main loop checks every frame, and logs anything else. */
-static unsigned long g_embedded;
-static int g_embed_lost;
-
 static int x_embed_error_handler(Display *d, XErrorEvent *e) {
     (void)d;
     if ((e->error_code == BadWindow || e->error_code == BadDrawable) &&
@@ -252,6 +258,22 @@ static int x_embed_error_handler(Display *d, XErrorEvent *e) {
                  e->request_code, e->minor_code, (unsigned long)e->resourceid);
     }
     return 0;
+}
+
+/* Software OpenGL (Mesa's llvmpipe) does not survive the failed swap: it
+ * carries on with the drawable it could not query and crashes inside the
+ * same call. By then the window is known to be gone and there is nothing
+ * left to draw into, so that crash is turned into a normal exit. Any other
+ * crash keeps its default behaviour. */
+static void on_fatal_signal(int sig) {
+    if (g_embed_lost) {
+        static const char msg[] = "theblackwall: exiting, our window is gone\n";
+        ssize_t n = write(STDERR_FILENO, msg, sizeof msg - 1);
+        (void)n;
+        _exit(0);
+    }
+    signal(sig, SIG_DFL);
+    raise(sig);
 }
 
 int plat_x11_embed(unsigned long child, unsigned long parent) {
@@ -266,7 +288,14 @@ int plat_x11_embed(unsigned long child, unsigned long parent) {
         return 0;
     }
     g_embedded = child;
+    g_embed_parent = parent;
     XSetErrorHandler(x_embed_error_handler);
+    struct sigaction sa;
+    memset(&sa, 0, sizeof sa);
+    sa.sa_handler = on_fatal_signal;
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIGSEGV, &sa, NULL);
+    sigaction(SIGBUS, &sa, NULL);
     return 1;
 }
 
