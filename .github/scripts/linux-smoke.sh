@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Headless checks of the Linux build. Run under Xvfb with software OpenGL:
-#   xvfb-run -a -s "-screen 0 1280x720x24 -noreset" .github/scripts/linux-smoke.sh
+#   .github/scripts/with-xvfb.sh .github/scripts/linux-smoke.sh
 # Writes screenshots and logs to out/smoke.
 set -euo pipefail
 
@@ -12,8 +12,12 @@ export XDG_CONFIG_HOME="$PWD/$OUT/config"
 mkdir -p "$XDG_CONFIG_HOME/theblackwall"
 printf 'density = 80\nfps = 30\n' > "$XDG_CONFIG_HOME/theblackwall/settings.conf"
 
-step() { printf '\n=== %s\n' "$*"; }
 die()  { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
+# every step first checks that the X server is still there
+step() {
+    xdpyinfo >/dev/null 2>&1 || die "the X server is gone (before: $*)"
+    printf '\n=== %s\n' "$*"
+}
 
 IM=convert
 command -v magick >/dev/null 2>&1 && IM=magick
@@ -56,6 +60,7 @@ start_parent() {
     echo "  parent window $PARENT_ID"
 }
 
+step "OpenGL"
 glxinfo -B > "$OUT/glxinfo.txt" 2>&1 || true
 grep -E "OpenGL (renderer|core profile version)" "$OUT/glxinfo.txt" || true
 
@@ -129,4 +134,5 @@ if "$BIN" --window-id 0x7fffffff --frames 1 2> "$OUT/badid.txt"; then die "accep
 cat "$OUT/badid.txt"
 if "$BIN" --window-id nonsense 2> /dev/null; then die "accepted a malformed window id"; fi
 
+step "done"
 printf '\nAll smoke tests passed.\n'

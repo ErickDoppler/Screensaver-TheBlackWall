@@ -2,7 +2,7 @@
 # End to end: install with tools/install-linux.sh, start a real XScreenSaver,
 # blank the screen and check that The Black Wall is what it shows. Run under
 # Xvfb:
-#   xvfb-run -a -s "-screen 0 1280x720x24 -noreset" .github/scripts/xscreensaver-e2e.sh
+#   .github/scripts/with-xvfb.sh .github/scripts/xscreensaver-e2e.sh
 # Writes logs and a screenshot to out/xscreensaver.
 set -euo pipefail
 
