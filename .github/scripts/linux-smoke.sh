@@ -45,18 +45,26 @@ wait_gone() {
     done
 }
 
-xwin_id() { xwininfo -name "$1" 2>/dev/null | awk '/Window id:/ { print $4 }'; }
+# The window another program owns: a minimal Xlib client of our own, which
+# prints its id and keeps the window until it is killed.
+XPARENT="$OUT/xparent"
+cc -O2 -Wall -o "$XPARENT" .github/scripts/xparent.c -lX11
 
 start_parent() {
-    xeyes -geometry 640x360+40+40 &
+    : > "$OUT/parent.id"
+    "$XPARENT" 640x360+40+40 > "$OUT/parent.id" 2> "$OUT/parent.err" &
     PARENT=$!
     PARENT_ID=""
     for _ in $(seq 100); do
-        PARENT_ID="$(xwin_id xeyes)"
+        PARENT_ID="$(head -n1 "$OUT/parent.id")"
         [ -n "$PARENT_ID" ] && break
+        alive "$PARENT" || break
         sleep 0.1
     done
-    [ -n "$PARENT_ID" ] || die "the parent window did not appear"
+    if [ -z "$PARENT_ID" ]; then
+        cat "$OUT/parent.err"
+        die "the parent window did not appear"
+    fi
     echo "  parent window $PARENT_ID"
 }
 
@@ -86,6 +94,24 @@ echo "  red wall: green $g0, red $r0;  green wall: green $g, red $r"
 awk -v g0="$g0" -v r0="$r0" -v g="$g" -v r="$r" \
     'BEGIN { exit !(g > 1.5 * g0 && g > 0.01 && r < 0.9 * r0) }' || die "the wall did not turn green"
 cp "$OUT/settings.saved" "$XDG_CONFIG_HOME/theblackwall/settings.conf"
+
+# Diagnostic only: xeyes (an Xt client, like parts of XScreenSaver) has been
+# unable to connect at this point while other clients could. Record why.
+step "diagnostic: an Xt client connects"
+if command -v strace >/dev/null 2>&1; then
+    strace -f -tt -s 200 -o "$OUT/xeyes.strace" timeout 3 xeyes > "$OUT/xeyes.txt" 2>&1 || true
+else
+    timeout 3 xeyes > "$OUT/xeyes.txt" 2>&1 || true
+fi
+cat "$OUT/xeyes.txt"
+if grep -q "Can't open display" "$OUT/xeyes.txt"; then
+    echo "  xeyes could not connect; its connect() calls:"
+    grep -E 'socket\(|connect\(|getenv|XAUTH|\.Xauthority|ENOENT|ECONNREFUSED|EAGAIN' "$OUT/xeyes.strace" 2>/dev/null | tail -20
+    echo "  environment: DISPLAY=$DISPLAY XAUTHORITY=${XAUTHORITY:-unset} HOME=$HOME"
+    ls -la /tmp/.X11-unix/ 2>&1 | head
+else
+    echo "  xeyes connected (it was stopped after 3 s)"
+fi
 
 # ---------------------------------------------------------------------------
 step "--window-id draws inside another program's window"

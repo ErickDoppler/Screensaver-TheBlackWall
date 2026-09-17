@@ -35,7 +35,7 @@ jobs:
         run: |
           sudo apt-get install -y -q --no-install-recommends \
             xvfb xauth x11-apps x11-utils mesa-utils libgl1-mesa-dri \
-            imagemagick libxml2-utils procps \
+            imagemagick libxml2-utils procps strace \
             xscreensaver xscreensaver-data xscreensaver-gl
           xmllint --noout res/linux/theblackwall.xml
 
