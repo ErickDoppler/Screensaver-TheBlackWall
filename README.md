@@ -44,6 +44,13 @@ except the screensaver itself, and Visual Studio is not needed.
    powershell -ExecutionPolicy Bypass -File tools\install-windows.ps1
    ```
 
+   Use the script rather than Explorer's right-click **Install**: that verb
+   points Windows at wherever the `.scr` happens to be at the time, so a copy
+   left in `build\win-mingw` or in Downloads stops working the moment it is
+   moved or deleted (`2-build-for-win64.cmd clean` removes the build folder).
+   When the file Windows is pointed at does not exist, nothing happens on
+   idle, with no error - see [Nothing happens on idle](#nothing-happens-on-idle).
+
 To look at it before installing, run `build\win-mingw\TheBlackWall.scr /w`
 for a window or `/s` for fullscreen; `Esc` always exits.
 
@@ -124,8 +131,27 @@ Output either way: `build\win-mingw\TheBlackWall.scr`, a single static
 executable. See [docs/TOOLING.md](docs/TOOLING.md) for what is in the
 toolchain and why.
 
-Besides the installer script, you can right-click the `.scr` in Explorer and
-choose **Install**.
+### Nothing happens on idle
+
+The screensaver previews fine, but the screen never blanks by itself: Windows
+is pointed at a file that is not there any more. It says nothing when that
+happens. Check what it has:
+
+```powershell
+$p = (Get-ItemProperty 'HKCU:\Control Panel\Desktop').'SCRNSAVE.EXE'; $p; Test-Path $p
+```
+
+If that prints `False`, or a path in `build\win-mingw`, Downloads or
+`C:\Windows\system32` with a shortened name like `THEBLA~1.SCR`, run
+`tools\install-windows.ps1`: it copies the `.scr` somewhere permanent and
+points Windows at the full path. Explorer's right-click **Install** is what
+leaves the stale path behind, since it pins the file's current location.
+
+Two more things to check in the same key: `ScreenSaveActive` must be `"1"`,
+and `ScreenSaveTimeOut` is the idle time in seconds. Windows' "Change screen
+saver" dialog lists the `.scr` files in `C:\Windows\System32` and the Windows
+folder, so a per-user install does not add The Black Wall to that dropdown;
+the timeout box there still applies to it.
 
 ## Build and install options (Linux)
 
