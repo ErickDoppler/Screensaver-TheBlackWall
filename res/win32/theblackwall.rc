@@ -10,7 +10,7 @@ BEGIN
     IDS_DESCRIPTION "The Black Wall"
 END
 
-IDD_CONFIG DIALOGEX 0, 0, 310, 355
+IDD_CONFIG DIALOGEX 0, 0, 310, 436
 STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "The Black Wall - Settings"
 FONT 8, "MS Shell Dlg", 400, 0, 1
@@ -59,15 +59,26 @@ BEGIN
     CONTROL         "", IDC_CITYCOL, "Button", BS_OWNERDRAW | WS_TABSTOP, 254, 259, 36, 13
     AUTOCHECKBOX    "Show ghosts  (figures appear by the wall every 100 m of travel)", IDC_GHOSTS, 14, 276, 282, 10
 
-    GROUPBOX        "Power", IDC_STATIC, 7, 299, 296, 30
-    LTEXT           "Frame rate limit", IDC_STATIC, 14, 313, 90, 8
-    CONTROL         "", IDC_FPS, "msctls_trackbar32", TBS_HORZ | TBS_AUTOTICKS | WS_TABSTOP, 112, 310, 150, 15
-    RTEXT           "", IDC_FPS_VAL, 264, 313, 32, 8
+    GROUPBOX        "Reactivity", IDC_STATIC, 7, 300, 296, 74
+    LTEXT           "Wave amplitude", IDC_STATIC, 14, 315, 90, 8
+    CONTROL         "", IDC_WAVEAMP, "msctls_trackbar32", TBS_HORZ | TBS_AUTOTICKS | WS_TABSTOP, 112, 312, 150, 15
+    RTEXT           "", IDC_WAVEAMP_VAL, 264, 315, 32, 8
+    LTEXT           "Wave frequency", IDC_STATIC, 14, 332, 90, 8
+    CONTROL         "", IDC_WAVEFREQ, "msctls_trackbar32", TBS_HORZ | TBS_AUTOTICKS | WS_TABSTOP, 112, 329, 150, 15
+    RTEXT           "", IDC_WAVEFREQ_VAL, 264, 332, 32, 8
+    LTEXT           "Network spike intensity", IDC_STATIC, 14, 349, 100, 8
+    CONTROL         "", IDC_SPIKES, "msctls_trackbar32", TBS_HORZ | TBS_AUTOTICKS | WS_TABSTOP, 112, 346, 150, 15
+    RTEXT           "", IDC_SPIKES_VAL, 264, 349, 32, 8
 
-    PUSHBUTTON      "Defaults", IDC_DEFAULTS, 7, 334, 50, 14
-    PUSHBUTTON      "Position the ghosts...", IDC_POSE, 62, 334, 84, 14
-    DEFPUSHBUTTON   "OK", IDOK, 195, 334, 50, 14
-    PUSHBUTTON      "Cancel", IDCANCEL, 253, 334, 50, 14
+    GROUPBOX        "Power", IDC_STATIC, 7, 379, 296, 30
+    LTEXT           "Frame rate limit", IDC_STATIC, 14, 393, 90, 8
+    CONTROL         "", IDC_FPS, "msctls_trackbar32", TBS_HORZ | TBS_AUTOTICKS | WS_TABSTOP, 112, 390, 150, 15
+    RTEXT           "", IDC_FPS_VAL, 264, 393, 32, 8
+
+    PUSHBUTTON      "Defaults", IDC_DEFAULTS, 7, 414, 50, 14
+    PUSHBUTTON      "Position the ghosts...", IDC_POSE, 62, 414, 84, 14
+    DEFPUSHBUTTON   "OK", IDOK, 195, 414, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 253, 414, 50, 14
 END
 
 VS_VERSION_INFO VERSIONINFO

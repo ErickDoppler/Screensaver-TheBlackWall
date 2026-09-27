@@ -1,6 +1,8 @@
 /* User settings. One X-macro table drives defaults, clamping, persistence
  * (registry on Windows) and the command-line parser, so a setting is added in
- * exactly one place. Sliders are stored as 0..100 integers. */
+ * exactly one place. Most sliders are 0..100 integers; a few (fps, and the
+ * reactivity multipliers below, where 100 means "unchanged") use a wider or
+ * differently centred range - see the max column. */
 #ifndef BW_SETTINGS_H
 #define BW_SETTINGS_H
 
@@ -15,6 +17,9 @@ enum { PIXEL_SQUARE = 0, PIXEL_ROUND = 1, PIXEL_MATRIX = 2 };
     X(mouse_sensitivity,  "mouse-sensitivity",  50,     0,   100) \
     X(click_resets_view,  "click-resets-view",  0,      0,   1)   \
     X(exit_on_any_key,    "exit-on-any-key",    0,      0,   1)   \
+    X(wave_amplitude,     "wave-amplitude",     100,    0,   1000) \
+    X(wave_frequency,     "wave-frequency",     100,    0,   200) \
+    X(spike_intensity,    "spike-intensity",    100,    0,   200) \
     X(density,            "density",            100,    0,   100) \
     X(pixel_size,         "pixel-size",         42,     0,   100) \
     X(blur,               "blur",               20,     0,   100) \

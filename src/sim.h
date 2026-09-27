@@ -104,10 +104,14 @@ void sim_init(Sim *sim);
  * that summons the next figure (0 disables, < 0 summons at once); cam_z:
  * camera distance from the wall, used to detect the approach; at_home: the
  * camera is at its default resting depth, where the wave is made to reach
- * far enough to take the viewer along with the figure. */
+ * far enough to take the viewer along with the figure. wave_amp_mul,
+ * wave_freq_mul, spike_mul: user multipliers on the CPU/network reaction
+ * (settings.h wave-amplitude/wave-frequency/spike-intensity, /100 so 1.0 is
+ * "as designed"; 0 mutes that reaction, above 1 exaggerates it). */
 void sim_update(Sim *sim, float dt, float cpu, double bps,
                 double cam_x, float cam_z, float view_half_w, float view_h,
-                float moved_dx, float figure_every, int at_home);
+                float moved_dx, float figure_every, int at_home,
+                float wave_amp_mul, float wave_freq_mul, float spike_mul);
 /* The wall's surface z at a world point, wave and surge included (the same
  * formula the wall shader uses). Used to tell when the wall has swept over
  * the camera. */

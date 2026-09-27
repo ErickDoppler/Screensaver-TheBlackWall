@@ -50,6 +50,18 @@
           _label="Pixel shimmer" _low-label="Smooth" _high-label="Tearing"
           low="0" high="100" default="0"/>
 
+  <number id="waveamp" type="slider" arg="--wave-amplitude %"
+          _label="Wave amplitude" _low-label="Flat" _high-label="Wild"
+          low="0" high="1000" default="100"/>
+
+  <number id="wavefreq" type="slider" arg="--wave-frequency %"
+          _label="Wave frequency" _low-label="Slow" _high-label="Fast"
+          low="0" high="200" default="100"/>
+
+  <number id="spikes" type="slider" arg="--spike-intensity %"
+          _label="Network spike intensity" _low-label="Muted" _high-label="Strong"
+          low="0" high="200" default="100"/>
+
   <string id="wallcolor"    _label="Wall color (#RRGGBB)"    arg="--wall-color %"/>
   <string id="floorcolor"   _label="Floor color (#RRGGBB)"   arg="--floor-color %"/>
   <string id="spacecolor"   _label="Space color (#RRGGBB)"   arg="--space-color %"/>

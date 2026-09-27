@@ -249,12 +249,16 @@ per figure model (default 40000). `tools/make_icon.py` regenerates the icon.
 
 Setting keys: `side-movement`, `movement-speed`, `mouse-rotation`,
 `exit-on-mouse-move`, `mouse-sensitivity`, `click-resets-view`,
-`exit-on-any-key`, `density`, `pixel-size` (the dot itself, from about
-2 x 2 screen pixels up to a chunky LED), `blur`, `ghost-tail`, `shimmer`
-(0 = smooth, 100 = pixels flicker as if tearing off), `pixel-type`
-(square/round/matrix), `horizon` (distant city, default on), `show-ghosts`,
-`fps` (10..120, default 60), `wall-color`, `floor-color`, `space-color`,
-`horizon-color` (default blue).
+`exit-on-any-key`, `wave-amplitude` (0..1000, default 100: how strongly CPU
+load swells the wave, 0 flattens it, 100 is the design's default reaction),
+`wave-frequency` (0..200, default 100: how strongly CPU load tightens the
+wave's wavelength), `spike-intensity` (0..200, default 100: how strongly
+network traffic pushes spikes through the wall, 0 turns them off),
+`density`, `pixel-size` (the dot itself, from about 2 x 2 screen pixels up
+to a chunky LED), `blur`, `ghost-tail`, `shimmer` (0 = smooth, 100 = pixels
+flicker as if tearing off), `pixel-type` (square/round/matrix), `horizon`
+(distant city, default on), `show-ghosts`, `fps` (10..120, default 60),
+`wall-color`, `floor-color`, `space-color`, `horizon-color` (default blue).
 
 On Windows, settings persist in `HKCU\Software\TheBlackWall` and are edited
 in the settings dialog.

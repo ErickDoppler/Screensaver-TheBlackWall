@@ -31,7 +31,7 @@ void sim_init(Sim *sim) {
     sim->ghost.ember_t = -1.f;
 }
 
-static void spawn_spike(Sim *sim, double cam_x, float view_half_w, float view_h) {
+static void spawn_spike(Sim *sim, double cam_x, float view_half_w, float view_h, float spike_mul) {
     for (int i = 0; i < SIM_MAX_SPIKES; ++i) {
         Spike *s = &sim->spikes[i];
         if (s->active) continue;
@@ -44,7 +44,7 @@ static void spawn_spike(Sim *sim, double cam_x, float view_half_w, float view_h)
         s->x = cam_x + off;
         s->y = rng_range(&sim->rng, 0.4f, view_h * 0.9f);
         s->pointy = t;
-        s->amp = lerpf(0.35f, 4.5f, powf(t, 0.8f)) * rng_range(&sim->rng, 0.7f, 1.3f) * taper;
+        s->amp = lerpf(0.35f, 4.5f, powf(t, 0.8f)) * rng_range(&sim->rng, 0.7f, 1.3f) * taper * spike_mul;
         s->width = lerpf(2.4f, 0.4f, t) * rng_range(&sim->rng, 0.8f, 1.25f);
         s->life = lerpf(4.0f, 1.4f, t) * rng_range(&sim->rng, 0.7f, 1.3f);
         s->age = 0.f;
@@ -291,7 +291,8 @@ float sim_wall_z(const Sim *sim, double x_world, float y) {
 
 void sim_update(Sim *sim, float dt, float cpu, double bps,
                 double cam_x, float cam_z, float view_half_w, float view_h,
-                float moved_dx, float figure_every, int at_home) {
+                float moved_dx, float figure_every, int at_home,
+                float wave_amp_mul, float wave_freq_mul, float spike_mul) {
     sim->time += dt;
     update_ghost(sim, dt, cam_x, cam_z, moved_dx, figure_every, at_home);
 
@@ -308,8 +309,11 @@ void sim_update(Sim *sim, float dt, float cpu, double bps,
 
     /* --- CPU load -> wave character ------------------------------------ */
     sim->cpu = approachf(sim->cpu, clampf(cpu, 0.f, 1.f), CPU_TAU, dt);
-    float k_target   = WAVE_K0 * (1.f + 7.f * sim->cpu);
-    float amp_target = 0.9f * powf(1.f - sim->cpu, 1.6f);   /* 100 % -> flat line */
+    float k_target   = WAVE_K0 * (1.f + 7.f * sim->cpu) * wave_freq_mul;
+    /* Idle is a calm 0.9; busy grows to 1.5, on top of the frequency already
+     * tightening - a taut, agitated wave rather than one that flattens out
+     * (a maxed-out machine used to read as calmer, which read as a bug). */
+    float amp_target = lerpf(0.9f, 1.5f, sim->cpu) * wave_amp_mul;
     float speed      = 0.7f + 1.8f * sim->cpu;
     /* Changing k while keeping the phase continuous at the origin. */
     sim->wave_k   = approachf(sim->wave_k, k_target, WAVE_TAU, dt);
@@ -332,10 +336,11 @@ void sim_update(Sim *sim, float dt, float cpu, double bps,
     if (bps < IDLE_BPS) {
         sim->target_spikes = 0;
     } else if (bps <= TRICKLE_BPS) {
-        sim->target_spikes = (int)(lerpf(40.f, 60.f, (float)(bps / TRICKLE_BPS)) + 0.5f);
+        sim->target_spikes = (int)(lerpf(40.f, 60.f, (float)(bps / TRICKLE_BPS)) * spike_mul + 0.5f);
     } else {
-        sim->target_spikes = (int)(lerpf(60.f, 28.f, sim->traffic_t) + 0.5f);
+        sim->target_spikes = (int)(lerpf(60.f, 28.f, sim->traffic_t) * spike_mul + 0.5f);
     }
+    if (sim->target_spikes < 0) sim->target_spikes = 0;
     if (sim->target_spikes > SIM_MAX_SPIKES) sim->target_spikes = SIM_MAX_SPIKES;
 
     int active = 0;
@@ -349,7 +354,7 @@ void sim_update(Sim *sim, float dt, float cpu, double bps,
     if (active < sim->target_spikes) {
         sim->spawn_timer -= dt;
         if (sim->spawn_timer <= 0.f) {
-            spawn_spike(sim, cam_x, view_half_w, view_h);
+            spawn_spike(sim, cam_x, view_half_w, view_h, spike_mul);
             float mean_life = lerpf(4.0f, 1.4f, sim->traffic_t);
             /* Spread spawns so the population stays near the target. */
             sim->spawn_timer = mean_life / (float)(sim->target_spikes > 0 ? sim->target_spikes : 1)

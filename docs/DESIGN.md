@@ -291,13 +291,20 @@ The CPU sends only uniforms: wave parameters and up to 48 spikes.
 
 **Wave** (CPU load): `z = A * sin(k * x + phase + 0.25 y) + 0.3 A * sin(2.3 k x + phase2)`
 
-| CPU load | `k` (rad/unit)        | wavelength | amplitude `A`        |
-|----------|-----------------------|------------|----------------------|
-| 0 %      | 0.028                 | ~225 units | 0.9 (calm breathing) |
-| 100 %    | 0.028 * 8 = 0.224     | ~28 units  | 0 (flat line)        |
+| CPU load | `k` (rad/unit)        | wavelength | amplitude `A`         |
+|----------|-----------------------|------------|-----------------------|
+| 0 %      | 0.028                 | ~225 units | 0.9 (calm breathing)  |
+| 100 %    | 0.028 * 8 = 0.224     | ~28 units  | 1.5 (taut, agitated)  |
 
-`A = 0.9 * (1 - cpu)^1.6`, `k = 0.028 * (1 + 7 cpu)`; both follow the smoothed
-load with a 2.5 s time constant so the wall never snaps.
+`A = lerp(0.9, 1.5, cpu) * wave-amplitude/100`,
+`k = 0.028 * (1 + 7 cpu) * wave-frequency/100`; both follow the smoothed
+load with a 2.5 s time constant so the wall never snaps. Amplitude used to
+run the other way, `0.9 * (1 - cpu)^1.6`, collapsing to a flat line at 100 %
+load - the moment the wall should read as most agitated instead read as
+calmest, which is what `wave-amplitude`/`wave-frequency` (settings.h,
+default 100 = this curve unchanged, 0 mutes that axis, up to 1000/200 for
+more) exist to override outright if the design's own reaction still is not
+enough.
 
 **Spikes** (network): each spike is a bump `amp * env(t) * exp(-(r / width)^shape)`.
 
@@ -314,6 +321,11 @@ times the camera's visible half-width: full size within three times it,
 then tapering to 20 % at the outer edge, so the activity is seen far along
 the wall and thins out into the distance. Amplitude is capped so even the
 largest spike stays comfortably inside the frame.
+
+The `spike-intensity` setting (default 100 = unchanged) multiplies both the
+count above and each spike's amplitude, so it scales how dramatic the same
+traffic level looks without touching the bps thresholds that decide whether
+anything spawns at all; 0 turns spikes off regardless of traffic.
 
 **Figures**: dealt from a shuffled deck so every character appears once
 before any repeats (a new deck never starts with the one just shown); the
