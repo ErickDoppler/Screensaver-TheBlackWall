@@ -42,9 +42,17 @@
 #define IDC_CITYCOL       1044
 #define IDC_GHOSTS        1045
 
+/* Reactivity: how the wave and spikes respond to CPU/network load */
+#define IDC_WAVEAMP       1046
+#define IDC_WAVEAMP_VAL   1047
+#define IDC_WAVEFREQ      1048
+#define IDC_WAVEFREQ_VAL  1049
+#define IDC_SPIKES        1050
+#define IDC_SPIKES_VAL    1051
+
 /* Power */
-#define IDC_FPS           1050
-#define IDC_FPS_VAL       1051
+#define IDC_FPS           1052
+#define IDC_FPS_VAL       1053
 
 #define IDC_DEFAULTS      1060
 #define IDC_ABOUT         1061

@@ -519,7 +519,8 @@ int app_run(const AppConfig *cfg) {
         int at_home = fabsf(a.cam.z - home_z) < 1.f;
         sim_update(&a.sim, dt, a.stats.cpu, a.stats.bps, a.cam.x, a.cam.z,
                    render_view_half_width(&a.cam, aspect), render_view_height(&a.cam),
-                   moved_dx, figure_every, at_home);
+                   moved_dx, figure_every, at_home,
+                   a.s.wave_amplitude / 100.f, a.s.wave_frequency / 100.f, a.s.spike_intensity / 100.f);
         if (cfg->pose) {
             /* Pose tool: the chosen figure just stands there at full strength. */
             a.sim.ghost.phase = GHOST_STANDING;

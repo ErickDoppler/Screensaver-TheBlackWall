@@ -165,6 +165,9 @@ static void refresh_labels(HWND dlg) {
     set_label(dlg, IDC_BLUR_VAL,    L"%d %%", g_s.blur);
     set_label(dlg, IDC_GHOST_VAL,   L"%d %%", g_s.ghost_tail);
     set_label(dlg, IDC_SHIMMER_VAL, L"%d %%", g_s.shimmer);
+    set_label(dlg, IDC_WAVEAMP_VAL,  L"%d %%", g_s.wave_amplitude);
+    set_label(dlg, IDC_WAVEFREQ_VAL, L"%d %%", g_s.wave_frequency);
+    set_label(dlg, IDC_SPIKES_VAL,   L"%d %%", g_s.spike_intensity);
     set_label(dlg, IDC_FPS_VAL,     L"%d fps", g_s.target_fps);
 }
 
@@ -214,6 +217,9 @@ static void settings_to_controls(HWND dlg) {
     CheckRadioButton(dlg, IDC_PT_SQUARE, IDC_PT_MATRIX, IDC_PT_SQUARE + g_s.pixel_type);
     set_check(dlg, IDC_HORIZON, g_s.horizon);
     set_check(dlg, IDC_GHOSTS, g_s.show_ghosts);
+    set_slider(dlg, IDC_WAVEAMP, 0, 1000, g_s.wave_amplitude);
+    set_slider(dlg, IDC_WAVEFREQ, 0, 200, g_s.wave_frequency);
+    set_slider(dlg, IDC_SPIKES, 0, 200, g_s.spike_intensity);
     set_slider(dlg, IDC_FPS, 10, 120, g_s.target_fps);
     refresh_labels(dlg);
     refresh_dependencies(dlg);
@@ -237,6 +243,9 @@ static void controls_to_settings(HWND dlg) {
                    : get_check(dlg, IDC_PT_ROUND) ? PIXEL_ROUND : PIXEL_SQUARE;
     g_s.horizon            = get_check(dlg, IDC_HORIZON);
     g_s.show_ghosts        = get_check(dlg, IDC_GHOSTS);
+    g_s.wave_amplitude     = get_slider(dlg, IDC_WAVEAMP);
+    g_s.wave_frequency     = get_slider(dlg, IDC_WAVEFREQ);
+    g_s.spike_intensity    = get_slider(dlg, IDC_SPIKES);
     g_s.target_fps         = get_slider(dlg, IDC_FPS);
     settings_clamp(&g_s);
 }
