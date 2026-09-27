@@ -112,7 +112,16 @@ and invisible points are pushed out of the clip volume before rasterization.
   to trigger + 12, never closer than 45 down to 30). At a walk that is the
   45-30 band; at a run, where the wall reaches for a figure 128 units out,
   the figure appears at 237 and fades in over 163-140, so it is a distant
-  speck that grows rather than something taken while still invisible. When the camera comes within 10 units, the whole visible wall
+  speck that grows rather than something taken while still invisible. That
+  band is sized for Johnny's height (1.80 m); a taller figure is easier to
+  make out at the same distance, so left alone it would already loom large
+  while supposedly still a speck (most visibly Alt, 15 m tall). All three
+  distances (where it appears, and the fade band) scale by
+  `sqrt(height / 1.80)`, so a taller figure keeps growing from a speck for
+  longer instead of arriving already large; the full ratio would match
+  apparent size exactly but stretch Alt's approach to minutes at a walk, so
+  only the square root is taken - meaningfully more warning, not a much
+  longer wait. When the camera comes within 10 units, the whole visible wall
   swells out toward the figure ("surge", `uSurge` in `wall.vert`): a gaussian
   profile 25 units wide centred on the figure, whose top leans out 35 % more
   than its base (a breaking-wave curl) with a slow ripple rolling across it.
