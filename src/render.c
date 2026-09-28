@@ -36,7 +36,7 @@ extern const char shader_wall_vert[], shader_wall_frag[], shader_floor_vert[],
 #define CITY_HALF_X   1400.0f   /* generated strip; fades out long before its edge */
 #define CITY_POINT    1.6f
 #define CITY_SCALE    10.0f     /* geometry scale relative to the original design */
-#define FAR_PLANE     2500.0f
+#define FAR_PLANE     BW_FAR_PLANE
 /* Floor debris: coarse cells around the camera, ~45 % populated. */
 #define DEBRIS_CELL   3.0f
 #define DEBRIS_COLS   28
@@ -439,6 +439,11 @@ void render_frame(Renderer *r, const Settings *s, const Sim *sim,
     vec3 dir = v3(sinf(cam->yaw) * cosf(cam->pitch), sinf(cam->pitch), -cosf(cam->yaw) * cosf(cam->pitch));
     mat4 view = m4_look_at(eye, v3_add(eye, dir), v3(0, 1, 0));
     mat4 proj = m4_perspective(cam->fov_y, aspect, 0.1f, FAR_PLANE);
+    if (cam->vr_active) {
+        eye = cam->vr_eye;
+        view = cam->vr_view;
+        proj = cam->vr_proj;
+    }
     mat4 vp = m4_mul(proj, view);
     float proj_scale = r->height * 0.5f * proj.m[5];
 
@@ -455,7 +460,7 @@ void render_frame(Renderer *r, const Settings *s, const Sim *sim,
         ensure_targets(r);
         glBindFramebuffer(GL_FRAMEBUFFER, r->fbo_scene);
     } else {
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glBindFramebuffer(GL_FRAMEBUFFER, r->target_fbo);
     }
     glViewport(0, 0, r->width, r->height);
     glClearColor(((s->space_color >> 16) & 255) / 255.f, ((s->space_color >> 8) & 255) / 255.f,
@@ -700,8 +705,9 @@ figure_done:
     glDisable(GL_BLEND);
 
     if (!offscreen) return;
-    /* where the finished picture goes: the screen, or the glitch pass input */
-    const unsigned out_fbo = glitch_on ? r->fbo_out : 0;
+    /* where the finished picture goes: the screen (or VR eye), or the glitch
+     * pass input */
+    const unsigned out_fbo = glitch_on ? r->fbo_out : r->target_fbo;
 
     /* --- post: ghost tails --------------------------------------------------- */
     unsigned src_tex = r->tex_scene;
@@ -752,7 +758,7 @@ figure_done:
     /* --- post: signal loss at the corridor's end ------------------------------ */
     if (glitch_on) {
         unsigned p = r->prog_glitch;
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glBindFramebuffer(GL_FRAMEBUFFER, r->target_fbo);
         glUseProgram(p);
         glBindTexture(GL_TEXTURE_2D, r->tex_out);
         glUniform1i(glGetUniformLocation(p, "uTex"), 0);

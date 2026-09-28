@@ -385,6 +385,64 @@ With both sliders at 0 the scene renders straight to the back buffer.
 Assumption: the design does not say how to leave with the mouse when rotation
 is on, so a click exits in that mode.
 
+## VR (Windows, `vr.c`, `vrmenu.c`, `hud.c`)
+
+OpenXR, reached the way `Screensaver-Mriya` reaches it: no loader library, the
+active runtime found through the registry (`HKLM\SOFTWARE\Khronos\OpenXR\1\
+ActiveRuntime`), its DLL loaded directly, `xrGetInstanceProcAddr` taken from
+the negotiation handshake. A machine with no runtime or no headset plugged in
+gets exactly the desktop build; `vr_present()` is what decides, checked once
+in `app_run` before the main loop.
+
+`Camera` (`render.h`) carries a `vr_active` flag plus a precomputed `vr_view`/
+`vr_proj`/`vr_eye`. When set, `render_frame` uses them as-is instead of
+building a symmetric view/projection from `yaw`/`pitch`/`fov_y` - but `cam->x/
+y/z` keep meaning the player's logical position regardless, since the fog
+distance, the level of detail and the corridor depth are all keyed on them.
+`Renderer.target_fbo` is where the finished frame lands when nothing needs
+post-processing (0 for the window, an eye's swapchain framebuffer otherwise);
+the three spots in `render_frame` that used to bind framebuffer 0 outright now
+bind this field.
+
+The play space's own `-z` is wherever the player was facing when the OpenXR
+session started, not necessarily at the wall, so a `basis_yaw_pitch(cam.yaw,
+cam.pitch)` frame (mathx.h) remaps it: `world = basis_mul(player_basis,
+local)` for both the per-eye pose and the controller poses used for movement
+and menu aiming. The left stick moves relative to the headset's own
+horizontal forward, not `cam.yaw`; the right stick instead turns `cam.yaw`
+and tilts `cam.pitch` directly (the same fields the keyboard's J/L/I/K use on
+the desktop), which is what lets `basis_yaw_pitch` double as a stick-driven
+"cockpit tilt" without a separate rotation path. `cam.y` is not used in VR
+(the headset gives the real eye height); jumping instead offsets the eye's
+world Y directly by `jump_y`, riding the same arc the keyboard's jump uses
+(`integrate_jump`, shared by both).
+
+Eye separation comes straight from the runtime's own per-eye poses, which are
+occasionally reported wider than feels right in-scene; `vr-eye-distance`
+scales each eye's offset from the midpoint between them, so 100 % reproduces
+the runtime unmodified and the head position itself never moves as the
+slider changes.
+
+Render resolution per eye is dynamic without a second offscreen target: OpenXR
+lets a composition layer submit a sub-rectangle of a larger swapchain image,
+so `vr_set_render_scale` only shrinks the viewport `app_run` renders into
+(`VrView::render_w/h`) and the `imageRect` the compositor is told to sample
+(`vr.c`) - never the swapchain itself. `vr-quality` 100 asks for that
+sub-rectangle to be the whole image (the runtime's native per-eye
+resolution, exactly what the desktop build would render at); below that it
+shrinks the fraction directly, and 0 ("Auto") instead lets `app_run` walk
+that same scale up or down each frame against a 90 Hz frame-time budget.
+
+`hud.c` is `Screensaver-Mriya`'s bitmap-font UI engine with everything but the
+generic primitives trimmed off (no flight HUD, no help panel - The Black Wall
+has neither). `vrmenu.c` reuses its pattern - a page painted into a texture
+hung on a world quad, hit-tested with the same arithmetic that laid it out,
+sliders included - but the content is written fresh: a top page (Enable
+movement, Settings, Exit) and a Settings page of six sliders that write
+straight into the `Settings` passed in (eye distance, quality, and the same
+density/pixel-size/ghost-tail/blur the desktop dialog exposes), saved to the
+registry when the menu closes.
+
 ## Platform shells
 
 Windows (`platform_win32.c`): registry store, `GetSystemTimes` for CPU,

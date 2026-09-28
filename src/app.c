@@ -5,6 +5,9 @@
 #include "sim.h"
 #include "stats.h"
 #include "models.h"
+#include "vr.h"
+#include "hud.h"
+#include "vrmenu.h"
 #include <SDL3/SDL.h>
 #include <stdio.h>
 #include <string.h>
@@ -43,6 +46,18 @@ typedef struct App {
     float       elapsed;            /* seconds since start */
     float       mouse_travel;       /* accumulated motion for exit-on-move */
     int         frames;
+    /* VR: a headset takes over movement and the menu; the window still shows
+     * a mirror of one eye. See vr.h/vrmenu.h. */
+    int         vr_on;
+    unsigned    vr_fbo;             /* rebound to each eye's swapchain image */
+    VrMenu      menu;
+    vec3        vr_fwd;             /* head-relative forward, floor-projected */
+    vec3        vr_head_pos;        /* head pose, world-local (see cam_lx) */
+    basis3      vr_head_basis;
+    int         vr_jump_prev;                 /* edge detection: the jump grip */
+    int         vr_trigger_prev[VR_HANDS];    /* edge detection: the menu trigger */
+    float       vr_auto_scale;       /* the render scale currently in effect (both manual and Auto) */
+    float       vr_quality_timer;    /* throttles how often it may change */
 } App;
 
 /* ------------------------------------------------------------------------ */
@@ -258,6 +273,144 @@ static float foot_speed_mult(const App *a) {
     return m;
 }
 
+/* The jump's own physics: shared by the keyboard and the VR grip, since both
+ * ride the same arc once it has started. */
+static void integrate_jump(App *a, float dt) {
+    if (a->airborne) {
+        a->jump_v -= a->jump_g * dt;
+        a->jump_y += a->jump_v * dt;
+        if (a->jump_y <= 0.f) {
+            a->jump_y = 0.f;
+            a->jump_v = 0.f;
+            a->airborne = 0;
+            a->land_t = a->elapsed;
+        }
+    } else if (a->jump_chain > 0 && a->elapsed - a->land_t > HOP_DROP) {
+        a->jump_chain = 0;                      /* stopped hopping: no more bonus */
+    }
+}
+
+/* --- VR: left stick moves, right stick looks around, left grip runs, right
+ * grip jumps, either upper button (B on the right controller, Y on the
+ * left) opens the menu ---------------------------------------------------- */
+#define VR_MOVE_HAND       0      /* left stick: move */
+#define VR_LOOK_HAND       1      /* right stick: look (yaw/pitch) */
+#define VR_RUN_HAND        0      /* left grip: run */
+#define VR_JUMP_HAND       1      /* right grip: jump */
+#define VR_GRIP_THRESHOLD  0.6f
+#define VR_TRIGGER_THRESHOLD 0.6f
+#define VR_STICK_DEADZONE  0.15f
+#define VR_LOOK_RATE       1.6f   /* rad/s at full stick deflection */
+#define VR_MENU_DISTANCE   1.0f   /* metres in front of the head, when opened */
+/* Assumed standing eye height, if the runtime's own floor tracking looks
+ * implausible (a seated-only setup, or a LOCAL space with no stage that
+ * reports height near its own origin rather than the real floor) - the
+ * player would otherwise end up dragging along the ground. A real, plausible
+ * tracked height is always used as-is. */
+#define VR_DEFAULT_EYE_HEIGHT 1.8f
+static vec3 vr_safe_head_pos(vec3 p) {
+    if (p.y < 0.5f) p.y = VR_DEFAULT_EYE_HEIGHT;
+    return p;
+}
+
+static void vr_update(App *a, float dt) {
+    const VrInput *in = vr_input();
+
+    /* the right stick: look around. Rotates cam.yaw/pitch exactly as the
+     * keyboard's J/L/I/K do, which is also what steers the play space's own
+     * reference frame below - so looking with the stick turns the world the
+     * same way physically turning your head does. */
+    float lx = in->stick_x[VR_LOOK_HAND], ly = in->stick_y[VR_LOOK_HAND];
+    if (fabsf(lx) < VR_STICK_DEADZONE) lx = 0.f;
+    if (fabsf(ly) < VR_STICK_DEADZONE) ly = 0.f;
+    if (lx != 0.f || ly != 0.f) {
+        mark_input(a);
+        a->cam.yaw = wrap_angle(a->cam.yaw + lx * VR_LOOK_RATE * dt);
+        a->cam.pitch = clampf(a->cam.pitch + ly * VR_LOOK_RATE * dt, -0.35f, 1.10f);
+    }
+
+    float cam_lx = (float)(a->cam.x - a->sim.origin_x);
+    basis3 player = basis_yaw_pitch(a->cam.yaw, a->cam.pitch);
+    vec3 floor_pos = v3(cam_lx, a->jump_y, (float)a->cam.z);
+
+    /* the head, in the same local (sim-origin-relative) space as floor_pos;
+     * kept from the last frame with a pose when the runtime skips a frame */
+    if (vr_should_render() && vr_view_count() > 0) {
+        const VrView *hv = vr_view(0);
+        a->vr_head_basis = basis_mul(player, hv->basis);
+        a->vr_head_pos = v3_add(floor_pos, basis_apply(player, vr_safe_head_pos(hv->pos)));
+        vec3 fwd = v3_norm(v3(-a->vr_head_basis.z.x, 0.f, -a->vr_head_basis.z.z));
+        if (fwd.x != 0.f || fwd.z != 0.f) a->vr_fwd = fwd;
+    }
+
+    /* the left stick: move, head-relative and floor-projected */
+    float sx = in->stick_x[VR_MOVE_HAND], sy = in->stick_y[VR_MOVE_HAND];
+    if (fabsf(sx) < VR_STICK_DEADZONE) sx = 0.f;
+    if (fabsf(sy) < VR_STICK_DEADZONE) sy = 0.f;
+    float mag = sqrtf(sx * sx + sy * sy);
+    if (mag > 1.f) { sx /= mag; sy /= mag; }
+    int moving = sx != 0.f || sy != 0.f;
+    if (moving) {
+        mark_input(a);
+        float mult = (in->squeeze[VR_RUN_HAND] > VR_GRIP_THRESHOLD ? SPRINT_MULT : 1.f) *
+                     (a->jump_chain >= HOP_FROM ? HOP_MULT : 1.f);
+        float fx = a->vr_fwd.x, fz = a->vr_fwd.z, rx = -fz, rz = fx;
+        float mv = 4.f * mult * dt;
+        a->cam.x += (double)((sy * fx + sx * rx) * mv);
+        a->cam.z = clampf(a->cam.z + (sy * fz + sx * rz) * mv, 2.5f, CORRIDOR_DEPTH);
+    }
+
+    /* the right grip: jump, edge-triggered so holding it does not rocket us */
+    int jump_grip = in->squeeze[VR_JUMP_HAND] > VR_GRIP_THRESHOLD;
+    if (jump_grip && !a->vr_jump_prev) { mark_input(a); jump(a, moving); }
+    a->vr_jump_prev = jump_grip;
+    integrate_jump(a, dt);
+
+    /* the menu: opened and closed with either hand's upper button, worked
+     * like a laser pointer with a trigger (held down, it drags a slider) */
+    if (in->upper_edge[0] || in->upper_edge[1]) {
+        vrmenu_open(&a->menu, !a->menu.open);
+        if (!a->menu.open) settings_save(&a->s);
+    }
+    if (!a->menu.open) return;
+    if (a->menu.place_pending) {
+        vec3 fwd = v3_scale(a->vr_head_basis.z, -1.f);
+        a->menu.pos = v3_add(a->vr_head_pos, v3_scale(fwd, VR_MENU_DISTANCE));
+        a->menu.basis = a->vr_head_basis;
+        a->menu.place_pending = 0;
+    }
+    int aimed_by = -1;
+    for (int h = VR_HANDS - 1; h >= 0; --h) {
+        if (!in->active[h]) { a->vr_trigger_prev[h] = 0; continue; }
+        vec3 dir = basis_apply(player, v3_scale(in->aim_basis[h].z, -1.f));
+        vec3 from = v3_add(floor_pos, basis_apply(player, in->aim_pos[h]));
+        int trig = in->trigger[h] > VR_TRIGGER_THRESHOLD;
+        float u, v;
+        if (vrmenu_aim(&a->menu, from, dir, &u, &v)) {
+            aimed_by = h;
+            vrmenu_hover(&a->menu, &a->s, a->side_movement, u, v);
+            if (trig && !a->vr_trigger_prev[h]) {
+                int action = vrmenu_click(&a->menu, &a->s, a->side_movement, u, v);
+                if (action == VRMENU_MOVEMENT) {
+                    a->side_movement = !a->side_movement;
+                    a->auto_turn_at = a->elapsed + AUTO_TURN_DELAY;
+                } else if (action == VRMENU_EXIT) {
+                    request_exit(a);
+                }
+            } else if (trig && a->vr_trigger_prev[h]) {
+                vrmenu_drag(&a->menu, &a->s, u, v);
+            } else if (!trig && a->vr_trigger_prev[h]) {
+                vrmenu_release(&a->menu);
+            }
+            a->vr_trigger_prev[h] = trig;
+            break;
+        }
+        a->vr_trigger_prev[h] = trig;
+    }
+    if (aimed_by < 0) { a->menu.hover = -1; vrmenu_release(&a->menu); }
+    vrmenu_paint(&a->menu, &a->s, a->side_movement);
+}
+
 static void pose_title(App *a) {
     char title[200];
     snprintf(title, sizeof title,
@@ -364,6 +517,7 @@ static void update_camera(App *a, float dt) {
                                               : lerpf(0.15f, 3.0f, a->s.movement_speed / 100.f);
         a->cam.x += speed * dt;
     }
+    if (a->vr_on) { vr_update(a, dt); return; }
     if (!takes_input(a)) return;
     if (a->cfg->mode == MODE_FULLSCREEN && a->s.exit_on_any_key) return;
     const bool *k = SDL_GetKeyboardState(NULL);
@@ -391,18 +545,7 @@ static void update_camera(App *a, float dt) {
     int ctrl = k[SDL_SCANCODE_LCTRL] || k[SDL_SCANCODE_RCTRL];
     if (ctrl || k[SDL_SCANCODE_LSHIFT] || k[SDL_SCANCODE_RSHIFT] || a->airborne) mark_input(a);
     a->crouch = approachf(a->crouch, ctrl ? -CROUCH_DROP : 0.f, 0.09f, dt);
-    if (a->airborne) {
-        a->jump_v -= a->jump_g * dt;
-        a->jump_y += a->jump_v * dt;
-        if (a->jump_y <= 0.f) {
-            a->jump_y = 0.f;
-            a->jump_v = 0.f;
-            a->airborne = 0;
-            a->land_t = a->elapsed;
-        }
-    } else if (a->jump_chain > 0 && a->elapsed - a->land_t > HOP_DROP) {
-        a->jump_chain = 0;                      /* stopped hopping: no more bonus */
-    }
+    integrate_jump(a, dt);
     a->cam.y = fmaxf(0.15f, a->base_y + a->crouch) + a->jump_y;
     if (k[SDL_SCANCODE_J]) { a->cam.yaw   = wrap_angle(a->cam.yaw - rot); mark_input(a); }
     if (k[SDL_SCANCODE_L]) { a->cam.yaw   = wrap_angle(a->cam.yaw + rot); mark_input(a); }
@@ -479,6 +622,25 @@ int app_run(const AppConfig *cfg) {
         pose_title(&a);
     }
 
+    /* VR: only for a real run, on Windows, with a runtime and a headset - a
+     * machine with neither has vr_present() report so up front, and the rest
+     * of the app runs exactly as it always has. */
+    if ((cfg->mode == MODE_FULLSCREEN || cfg->mode == MODE_WINDOW) &&
+        !cfg->pose && !cfg->dump_path && vr_present() && vr_init()) {
+        if (hud_init() && vrmenu_init(&a.menu)) {
+            a.vr_on = 1;
+            a.vr_fwd = v3(sinf(a.cam.yaw), 0.f, -cosf(a.cam.yaw));
+            a.vr_auto_scale = 1.f;
+            glGenFramebuffers(1, &a.vr_fbo);
+            plat_log("vr: headset active, %d view(s)", vr_view_count());
+        } else {
+            plat_log("vr: menu setup failed, continuing on the monitor");
+            vrmenu_shutdown(&a.menu);
+            hud_shutdown();
+            vr_shutdown();
+        }
+    }
+
     if (cfg->mode == MODE_FULLSCREEN) {
         SDL_HideCursor();
         if (a.s.mouse_rotation) SDL_SetWindowRelativeMouseMode(a.win, true);
@@ -506,6 +668,38 @@ int app_run(const AppConfig *cfg) {
         if (cfg->mode == MODE_PREVIEW && !plat_win32_window_alive(cfg->parent_hwnd)) break;
 #endif
         if (!a.running) break;
+        if (a.vr_on) {
+            /* Quality 0 is "Auto": ease the render scale down when a frame
+             * overruns a 90 Hz budget, and back up when there is headroom,
+             * so a slow machine trades resolution for not dropping frames.
+             * Above 0, the slider is a direct render-resolution fraction -
+             * 100 % is the swapchain's own native size.
+             *
+             * Either way the result is snapped to a 5 % grid and only acted
+             * on a few times a second: a render-resolution change makes
+             * render.c reallocate five GPU targets (ensure_targets), and
+             * doing that every single frame while a finger is on the slider
+             * (or while Auto hunts for a setting) stalls the very frame the
+             * headset is waiting on - which is what "quality breaks
+             * everything" was. */
+            a.vr_quality_timer += dt;
+            if (a.vr_quality_timer >= 0.3f) {
+                a.vr_quality_timer = 0.f;
+                float scale;
+                if (a.s.vr_quality <= 0) {
+                    float budget = 1.f / 90.f;
+                    if (dt > budget * 1.3f) scale = a.vr_auto_scale - 0.1f;
+                    else if (dt < budget * 0.8f) scale = a.vr_auto_scale + 0.05f;
+                    else scale = a.vr_auto_scale;
+                } else {
+                    scale = lerpf(0.5f, 1.f, clampf(a.s.vr_quality / 100.f, 0.f, 1.f));
+                }
+                scale = clampf(scale, 0.5f, 1.f);
+                a.vr_auto_scale = roundf(scale * 20.f) / 20.f;   /* 5 % steps */
+            }
+            vr_set_render_scale(a.vr_auto_scale);
+        }
+        if (a.vr_on && !vr_begin_frame()) { request_exit(&a); break; }   /* the runtime dropped the session */
 
         stats_update(&a.stats, dt);
         update_camera(&a, dt);
@@ -561,8 +755,51 @@ int app_run(const AppConfig *cfg) {
             if (pw != cw || ph != ch) SDL_SetWindowSize(a.win, pw, ph);
         }
 #endif
-        render_resize(&a.r, a.width, a.height);
-        render_frame(&a.r, &eff, &a.sim, &a.cam, a.elapsed, dt);
+        if (a.vr_on) {
+            if (vr_should_render()) {
+                float cam_lx = (float)(a.cam.x - a.sim.origin_x);
+                basis3 player = basis_yaw_pitch(a.cam.yaw, a.cam.pitch);
+                vec3 floor_pos = v3(cam_lx, a.jump_y, (float)a.cam.z);
+                /* Eye distance: scaled from the midpoint between the two eyes,
+                 * so 100 % is exactly what the runtime reports and the head
+                 * stays put as the slider moves. */
+                float eye_scale = a.s.vr_eye_distance / 100.f;
+                vec3 eye0 = vr_view_count() >= 1 ? vr_safe_head_pos(vr_view(0)->pos) : v3(0.f, VR_DEFAULT_EYE_HEIGHT, 0.f);
+                vec3 eye1 = vr_view_count() >= 2 ? vr_safe_head_pos(vr_view(1)->pos) : eye0;
+                vec3 mid = v3_scale(v3_add(eye0, eye1), 0.5f);
+                for (int i = 0; i < vr_view_count(); ++i) {
+                    const VrView *v = vr_view(i);
+                    vec3 local_pos = v3_add(mid, v3_scale(v3_sub(vr_safe_head_pos(v->pos), mid), eye_scale));
+                    a.cam.vr_active = 1;
+                    basis3 eye_basis = basis_mul(player, v->basis);
+                    vec3 eye_pos = v3_add(floor_pos, basis_apply(player, local_pos));
+                    a.cam.vr_view = m4_view(eye_basis, eye_pos);
+                    a.cam.vr_proj = m4_frustum(v->tan_l, v->tan_r, v->tan_d, v->tan_u, 0.1f, BW_FAR_PLANE);
+                    a.cam.vr_eye = eye_pos;
+                    glBindFramebuffer(GL_FRAMEBUFFER, a.vr_fbo);
+                    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, v->tex, 0);
+                    a.r.target_fbo = a.vr_fbo;
+                    render_resize(&a.r, v->render_w, v->render_h);
+                    render_frame(&a.r, &eff, &a.sim, &a.cam, a.elapsed, dt);
+                    if (a.menu.open) vrmenu_draw(&a.menu, m4_mul(a.cam.vr_proj, a.cam.vr_view));
+                    if (i == 0) {
+                        /* mirror the left eye into the window, for whoever is
+                         * watching from the desk */
+                        glBindFramebuffer(GL_READ_FRAMEBUFFER, a.vr_fbo);
+                        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+                        glViewport(0, 0, a.width, a.height);
+                        glBlitFramebuffer(0, 0, v->render_w, v->render_h, 0, 0, a.width, a.height,
+                                          GL_COLOR_BUFFER_BIT, GL_LINEAR);
+                    }
+                }
+                a.cam.vr_active = 0;
+                a.r.target_fbo = 0;
+            }
+            vr_end_frame();
+        } else {
+            render_resize(&a.r, a.width, a.height);
+            render_frame(&a.r, &eff, &a.sim, &a.cam, a.elapsed, dt);
+        }
         a.frames++;
 
         if (cfg->dump_path && cfg->frame_limit > 0 && a.frames >= cfg->frame_limit) {
@@ -594,6 +831,12 @@ int app_run(const AppConfig *cfg) {
 #endif
 
 done:
+    if (a.vr_on) {
+        vrmenu_shutdown(&a.menu);
+        hud_shutdown();
+        vr_shutdown();
+        if (a.vr_fbo) glDeleteFramebuffers(1, &a.vr_fbo);
+    }
     render_shutdown(&a.r);
     if (a.gl) SDL_GL_DestroyContext(a.gl);
     if (a.win) SDL_DestroyWindow(a.win);
