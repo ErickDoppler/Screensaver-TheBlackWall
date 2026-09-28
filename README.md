@@ -258,7 +258,11 @@ network traffic pushes spikes through the wall, 0 turns them off),
 to a chunky LED), `blur`, `ghost-tail`, `shimmer` (0 = smooth, 100 = pixels
 flicker as if tearing off), `pixel-type` (square/round/matrix), `horizon`
 (distant city, default on), `show-ghosts`, `fps` (10..120, default 60),
-`wall-color`, `floor-color`, `space-color`, `horizon-color` (default blue).
+`wall-color`, `floor-color`, `space-color`, `horizon-color` (default blue),
+`vr-eye-distance` (0..300, default 100: the headset's own reported eye
+separation, scaled from its midpoint - only used in VR), `vr-quality`
+(0..100, default 100: VR's per-eye render resolution, 100 is native, 0 is
+Auto).
 
 On Windows, settings persist in `HKCU\Software\TheBlackWall` and are edited
 in the settings dialog.
@@ -313,17 +317,29 @@ in a window or fullscreen (not the preview) puts you inside the wall instead
 of watching it through the monitor - no setting to turn it on, and nothing
 changes on a machine with no headset.
 
-| Control                        | Action                                |
-|---------------------------------|---------------------------------------|
-| Thumbsticks (either controller) | move, relative to where you are looking |
-| Left grip                       | run (three times normal speed)        |
-| Right grip                      | jump                                  |
-| B (right) or Y (left)           | open or close the menu                |
-| Trigger, pointed at the menu    | click                                 |
+| Control                       | Action                                       |
+|--------------------------------|-----------------------------------------------|
+| Left stick                     | move, relative to where you are looking       |
+| Right stick                    | look around: left/right turns, forward/back tilts the view up/down |
+| Left grip                      | run (three times normal speed)                |
+| Right grip                     | jump                                          |
+| B (right) or Y (left)          | open or close the menu                        |
+| Trigger, pointed at the menu   | click, or drag a slider                       |
 
-The menu is a small panel that opens in front of you: **Auto move**, which
-toggles the same automatic drift along the wall the desktop version does, and
-**Exit**. The monitor keeps showing a mirror of the left eye.
+The menu is a small panel that opens in front of you:
+
+* **Enable movement** - the same automatic drift along the wall the desktop
+  version does.
+* **Settings** - a second page of sliders: **Eye distance** (if the 3D
+  stereo effect feels exaggerated or flat, this is what to move), **Quality**
+  (100 % renders each eye at the headset's own native resolution; below that
+  trades resolution for frame rate; 0 is **Auto**, which adjusts on its own
+  to whatever the machine can hold), **Wall density**, **Pixel size**,
+  **Ghost tail** and **Blur** - the same settings as the desktop dialog.
+  Changes are saved when the menu closes.
+* **Exit**.
+
+The monitor keeps showing a mirror of the left eye.
 
 ## Layout
 

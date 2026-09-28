@@ -29,7 +29,9 @@ enum { PIXEL_SQUARE = 0, PIXEL_ROUND = 1, PIXEL_MATRIX = 2 };
     X(horizon,            "horizon",            1,      0,   1)   \
     X(show_ghosts,        "show-ghosts",        1,      0,   1)   \
     X(ghost_yaws,         "ghost-yaws",         0,      0,   0x1FFFFF) \
-    X(target_fps,         "fps",                60,     10,  120)
+    X(target_fps,         "fps",                60,     10,  120)   \
+    X(vr_eye_distance,    "vr-eye-distance",    100,    0,   300) \
+    X(vr_quality,         "vr-quality",         100,    0,   100)
 
 /*  field         key            default (0xRRGGBB) */
 #define BW_SETTINGS_COLOR(X) \

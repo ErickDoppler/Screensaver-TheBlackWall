@@ -60,6 +60,18 @@ static inline basis3 basis_yaw(float yaw) {
     b.z = v3(-s, 0.f, c);
     return b;
 }
+/* Yaw about +y, then pitch about the new +x - the same convention as the
+ * desktop camera's own forward vector (see render.c/app.c), so a VR "cockpit
+ * tilt" control can pitch the play space exactly as far as the keyboard's I/K
+ * pitches the desktop view. */
+static inline basis3 basis_yaw_pitch(float yaw, float pitch) {
+    float cy = cosf(yaw), sy = sinf(yaw), cp = cosf(pitch), sp = sinf(pitch);
+    vec3 fwd = v3(sy * cp, sp, -cy * cp);
+    vec3 right = v3(cy, 0.f, sy);
+    vec3 up = v3_cross(right, fwd);
+    basis3 b = { right, up, v3_scale(fwd, -1.f) };
+    return b;
+}
 
 static inline mat4 m4_identity(void) {
     mat4 r = {{ 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 }};

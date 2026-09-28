@@ -22,7 +22,11 @@ typedef struct VrView {
     float  tan_l, tan_r, tan_d, tan_u;
     basis3 basis;                  /* where this eye looks, in the play space */
     vec3   pos;                    /* where this eye is, metres from its origin */
-    int    w, h;
+    int    w, h;                   /* the swapchain image's own size, fixed */
+    /* How much of it to actually draw into this frame - vr_set_render_scale
+     * shrinks this for performance without reallocating the swapchain; the
+     * compositor is told to sample only this sub-rectangle. */
+    int    render_w, render_h;
     unsigned tex;                  /* the runtime's image to draw into */
 } VrView;
 
@@ -51,6 +55,12 @@ int  vr_present(void);
 int  vr_init(void);
 void vr_shutdown(void);
 int  vr_running(void);             /* a session is up and drawing */
+
+/* Dynamic resolution: 0.3..1 of the swapchain's own size, applied to the
+ * next vr_begin_frame's views (VrView::render_w/h and the composition
+ * layer's sample rectangle). 1 (the default) is the runtime's full, native
+ * per-eye resolution. */
+void vr_set_render_scale(float scale);
 
 /* Waits for the runtime's own cadence and takes this frame's poses.
  * Returns 0 when the runtime says not to draw (the headset is off the head,

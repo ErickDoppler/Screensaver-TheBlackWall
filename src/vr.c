@@ -28,6 +28,7 @@ const VrView *vr_view(int i) { (void)i; return NULL; }
 void vr_end_frame(void) {}
 const VrInput *vr_input(void) { static VrInput z; return &z; }
 void vr_recentre(void) {}
+void vr_set_render_scale(float scale) { (void)scale; }
 #else
 
 /* the OpenXR structs are filled field by field; their `next` chains stay null */
@@ -125,6 +126,7 @@ static struct {
     XrPath           hand_path[VR_HANDS];
     VrInput          in;
     int              prev_lower[VR_HANDS], prev_upper[VR_HANDS], prev_click[VR_HANDS];
+    float            render_scale;
 } V;
 
 static int xr_ok(XrResult r, const char *what) {
@@ -415,6 +417,7 @@ static int setup_input(void) {
 /* ---- start-up ------------------------------------------------------------ */
 int vr_init(void) {
     memset(&V, 0, sizeof V);
+    V.render_scale = 1.f;
     if (!load_runtime()) return 0;
 
     const char *exts[] = { XR_KHR_OPENGL_ENABLE_EXTENSION_NAME };
@@ -474,10 +477,20 @@ int vr_init(void) {
     r = pxrCreateSession(V.inst, &sci, &V.session);
     if (XR_FAILED(r)) { plat_log("vr: xrCreateSession failed (%d)", (int)r); vr_shutdown(); return 0; }
 
+    /* STAGE is explicitly floor-anchored (Y = 0 at the floor), which is what
+     * the walking simulation needs for a real standing eye height. LOCAL's
+     * own Y origin is left to the runtime, and some place it at the eye
+     * instead of the floor - which the app would then read as height zero,
+     * pinning the camera to the ground. Fall back to LOCAL only if the
+     * runtime has no stage (a seated-only setup). */
     XrReferenceSpaceCreateInfo rs = { XR_TYPE_REFERENCE_SPACE_CREATE_INFO };
-    rs.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_LOCAL;
+    rs.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_STAGE;
     rs.poseInReferenceSpace.orientation.w = 1.f;
-    if (!xr_ok(pxrCreateReferenceSpace(V.session, &rs, &V.space), "xrCreateReferenceSpace")) { vr_shutdown(); return 0; }
+    if (XR_FAILED(pxrCreateReferenceSpace(V.session, &rs, &V.space))) {
+        plat_log("vr: no stage space, falling back to LOCAL (eye height may be off)");
+        rs.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_LOCAL;
+        if (!xr_ok(pxrCreateReferenceSpace(V.session, &rs, &V.space), "xrCreateReferenceSpace")) { vr_shutdown(); return 0; }
+    }
 
     /* the colour format: the runtime's list, in its own order of preference */
     uint32_t fn = 0;
@@ -511,6 +524,8 @@ int vr_init(void) {
         V.image_count[i] = ic;
         V.views[i].w = (int)sc.width;
         V.views[i].h = (int)sc.height;
+        V.views[i].render_w = V.views[i].w;
+        V.views[i].render_h = V.views[i].h;
     }
     plat_log("vr: %u views, %dx%d each", V.view_count, V.views[0].w, V.views[0].h);
 
@@ -550,6 +565,7 @@ int vr_view_count(void) { return (int)V.view_count; }
 const VrView *vr_view(int i) { return (i >= 0 && (uint32_t)i < V.view_count) ? &V.views[i] : NULL; }
 int vr_should_render(void) { return V.should_render; }
 void vr_recentre(void) { /* the play space is the runtime's business */ }
+void vr_set_render_scale(float scale) { V.render_scale = clampf(scale, 0.3f, 1.f); }
 
 /* ---- the frame ----------------------------------------------------------- */
 static void poll_events(void) {
@@ -676,13 +692,24 @@ int vr_begin_frame(void) {
         V.views[i].tan_r = tanf(V.xviews[i].fov.angleRight);
         V.views[i].tan_d = tanf(V.xviews[i].fov.angleDown);
         V.views[i].tan_u = tanf(V.xviews[i].fov.angleUp);
+        int rw = (int)(V.views[i].w * V.render_scale + 0.5f);
+        int rh = (int)(V.views[i].h * V.render_scale + 0.5f);
+        V.views[i].render_w = rw < 1 ? 1 : rw;
+        V.views[i].render_h = rh < 1 ? 1 : rh;
 
         V.proj_views[i] = (XrCompositionLayerProjectionView){ XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW };
         V.proj_views[i].pose = V.xviews[i].pose;
         V.proj_views[i].fov = V.xviews[i].fov;
         V.proj_views[i].subImage.swapchain = V.chain[i];
-        V.proj_views[i].subImage.imageRect.extent.width = V.views[i].w;
-        V.proj_views[i].subImage.imageRect.extent.height = V.views[i].h;
+        V.proj_views[i].subImage.imageRect.extent.width = V.views[i].render_w;
+        V.proj_views[i].subImage.imageRect.extent.height = V.views[i].render_h;
+        /* imageRect is top-left-origin (Vulkan/D3D convention) regardless of
+         * graphics API, but glViewport(0, 0, render_w, render_h) - what
+         * app.c actually renders with - fills the BOTTOM of the image in
+         * OpenGL's own bottom-left convention. Below full resolution those
+         * are different rows, so the offset has to shift down by the
+         * shrunk margin or the compositor samples an unrendered strip. */
+        V.proj_views[i].subImage.imageRect.offset.y = V.views[i].h - V.views[i].render_h;
     }
     V.should_render = 1;
     return 1;

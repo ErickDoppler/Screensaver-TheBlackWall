@@ -405,23 +405,43 @@ the three spots in `render_frame` that used to bind framebuffer 0 outright now
 bind this field.
 
 The play space's own `-z` is wherever the player was facing when the OpenXR
-session started, not necessarily at the wall, so a `basis_yaw(cam.yaw)` frame
-(mathx.h) remaps it: `world = basis_mul(player_basis, local)` for both the
-per-eye pose and the controller poses used for movement and menu aiming.
-Thumbsticks move relative to the headset's own horizontal forward, not
-`cam.yaw`, since nothing here offers a snap-turn control - the player turns by
-turning their head or body, same as walking round a room. `cam.y` is not used
-in VR (the headset gives the real eye height); jumping instead offsets the
-eye's world Y directly by `jump_y`, riding the same arc the keyboard's jump
-uses (`integrate_jump`, shared by both).
+session started, not necessarily at the wall, so a `basis_yaw_pitch(cam.yaw,
+cam.pitch)` frame (mathx.h) remaps it: `world = basis_mul(player_basis,
+local)` for both the per-eye pose and the controller poses used for movement
+and menu aiming. The left stick moves relative to the headset's own
+horizontal forward, not `cam.yaw`; the right stick instead turns `cam.yaw`
+and tilts `cam.pitch` directly (the same fields the keyboard's J/L/I/K use on
+the desktop), which is what lets `basis_yaw_pitch` double as a stick-driven
+"cockpit tilt" without a separate rotation path. `cam.y` is not used in VR
+(the headset gives the real eye height); jumping instead offsets the eye's
+world Y directly by `jump_y`, riding the same arc the keyboard's jump uses
+(`integrate_jump`, shared by both).
+
+Eye separation comes straight from the runtime's own per-eye poses, which are
+occasionally reported wider than feels right in-scene; `vr-eye-distance`
+scales each eye's offset from the midpoint between them, so 100 % reproduces
+the runtime unmodified and the head position itself never moves as the
+slider changes.
+
+Render resolution per eye is dynamic without a second offscreen target: OpenXR
+lets a composition layer submit a sub-rectangle of a larger swapchain image,
+so `vr_set_render_scale` only shrinks the viewport `app_run` renders into
+(`VrView::render_w/h`) and the `imageRect` the compositor is told to sample
+(`vr.c`) - never the swapchain itself. `vr-quality` 100 asks for that
+sub-rectangle to be the whole image (the runtime's native per-eye
+resolution, exactly what the desktop build would render at); below that it
+shrinks the fraction directly, and 0 ("Auto") instead lets `app_run` walk
+that same scale up or down each frame against a 90 Hz frame-time budget.
 
 `hud.c` is `Screensaver-Mriya`'s bitmap-font UI engine with everything but the
 generic primitives trimmed off (no flight HUD, no help panel - The Black Wall
 has neither). `vrmenu.c` reuses its pattern - a page painted into a texture
-hung on a world quad, hit-tested with the same arithmetic that laid it out -
-but the content is written fresh and deliberately small: one page, two rows
-(Auto move, Exit), no paging or sliders, since that is all the menu is asked
-to hold for now.
+hung on a world quad, hit-tested with the same arithmetic that laid it out,
+sliders included - but the content is written fresh: a top page (Enable
+movement, Settings, Exit) and a Settings page of six sliders that write
+straight into the `Settings` passed in (eye distance, quality, and the same
+density/pixel-size/ghost-tail/blur the desktop dialog exposes), saved to the
+registry when the menu closes.
 
 ## Platform shells
 
