@@ -385,6 +385,44 @@ With both sliders at 0 the scene renders straight to the back buffer.
 Assumption: the design does not say how to leave with the mouse when rotation
 is on, so a click exits in that mode.
 
+## VR (Windows, `vr.c`, `vrmenu.c`, `hud.c`)
+
+OpenXR, reached the way `Screensaver-Mriya` reaches it: no loader library, the
+active runtime found through the registry (`HKLM\SOFTWARE\Khronos\OpenXR\1\
+ActiveRuntime`), its DLL loaded directly, `xrGetInstanceProcAddr` taken from
+the negotiation handshake. A machine with no runtime or no headset plugged in
+gets exactly the desktop build; `vr_present()` is what decides, checked once
+in `app_run` before the main loop.
+
+`Camera` (`render.h`) carries a `vr_active` flag plus a precomputed `vr_view`/
+`vr_proj`/`vr_eye`. When set, `render_frame` uses them as-is instead of
+building a symmetric view/projection from `yaw`/`pitch`/`fov_y` - but `cam->x/
+y/z` keep meaning the player's logical position regardless, since the fog
+distance, the level of detail and the corridor depth are all keyed on them.
+`Renderer.target_fbo` is where the finished frame lands when nothing needs
+post-processing (0 for the window, an eye's swapchain framebuffer otherwise);
+the three spots in `render_frame` that used to bind framebuffer 0 outright now
+bind this field.
+
+The play space's own `-z` is wherever the player was facing when the OpenXR
+session started, not necessarily at the wall, so a `basis_yaw(cam.yaw)` frame
+(mathx.h) remaps it: `world = basis_mul(player_basis, local)` for both the
+per-eye pose and the controller poses used for movement and menu aiming.
+Thumbsticks move relative to the headset's own horizontal forward, not
+`cam.yaw`, since nothing here offers a snap-turn control - the player turns by
+turning their head or body, same as walking round a room. `cam.y` is not used
+in VR (the headset gives the real eye height); jumping instead offsets the
+eye's world Y directly by `jump_y`, riding the same arc the keyboard's jump
+uses (`integrate_jump`, shared by both).
+
+`hud.c` is `Screensaver-Mriya`'s bitmap-font UI engine with everything but the
+generic primitives trimmed off (no flight HUD, no help panel - The Black Wall
+has neither). `vrmenu.c` reuses its pattern - a page painted into a texture
+hung on a world quad, hit-tested with the same arithmetic that laid it out -
+but the content is written fresh and deliberately small: one page, two rows
+(Auto move, Exit), no paging or sliders, since that is all the menu is asked
+to hold for now.
+
 ## Platform shells
 
 Windows (`platform_win32.c`): registry store, `GetSystemTimes` for CPU,

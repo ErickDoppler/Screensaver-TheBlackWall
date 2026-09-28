@@ -306,6 +306,25 @@ is gone.
 With **Mouse controlled rotation** on, moving the mouse looks around and a
 click exits.
 
+## VR
+
+On Windows, if an OpenXR runtime is registered and a headset is on, launching
+in a window or fullscreen (not the preview) puts you inside the wall instead
+of watching it through the monitor - no setting to turn it on, and nothing
+changes on a machine with no headset.
+
+| Control                        | Action                                |
+|---------------------------------|---------------------------------------|
+| Thumbsticks (either controller) | move, relative to where you are looking |
+| Left grip                       | run (three times normal speed)        |
+| Right grip                      | jump                                  |
+| B (right) or Y (left)           | open or close the menu                |
+| Trigger, pointed at the menu    | click                                 |
+
+The menu is a small panel that opens in front of you: **Auto move**, which
+toggles the same automatic drift along the wall the desktop version does, and
+**Exit**. The monitor keeps showing a mirror of the left eye.
+
 ## Layout
 
 ```

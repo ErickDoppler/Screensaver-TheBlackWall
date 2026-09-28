@@ -12,6 +12,14 @@ typedef struct Camera {
     float  y, z;         /* height above the floor, distance from the wall */
     float  yaw, pitch;   /* radians; yaw 0 looks straight at the wall */
     float  fov_y;        /* radians */
+    /* VR: when set, render_frame draws with this eye's own view/projection
+     * and position instead of building them from yaw/pitch/fov_y. x/y/z stay
+     * the player's logical position regardless - the fog, the level of
+     * detail and the corridor are all keyed on it, not on where either eye
+     * actually is. */
+    int    vr_active;
+    mat4   vr_view, vr_proj;
+    vec3   vr_eye;
 } Camera;
 
 void camera_reset(Camera *c);
@@ -20,6 +28,9 @@ void camera_reset(Camera *c);
 /* Beyond this distance from the wall, the wall grows and figures appear at
  * the camera's depth. */
 #define FAR_BACK_Z 50.f
+/* The projection's far plane - shared with app.c, which builds a VR eye's
+ * own (off-axis) projection matrix rather than calling m4_perspective. */
+#define BW_FAR_PLANE 2500.0f
 
 typedef struct WallUniforms {
     int view_proj, cam_pos, cols, cell_base, spacing, grid_x0, point_world, proj_scale,
@@ -60,6 +71,9 @@ typedef struct Renderer {
     int fbo_w, fbo_h;       /* size the offscreen targets were built for */
     float max_point_px;
     int points_drawn;       /* diagnostics */
+    /* Where the finished frame goes when nothing needs post-processing: 0 for
+     * the window, or a VR eye's swapchain framebuffer. */
+    unsigned target_fbo;
 } Renderer;
 
 int  render_init(Renderer *r);

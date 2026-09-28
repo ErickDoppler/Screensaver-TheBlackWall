@@ -45,7 +45,9 @@ set(BW_SHADERS
   src/shaders/post.vert src/shaders/ghost.frag
   src/shaders/blur.frag src/shaders/blit.frag src/shaders/glitch.frag
   src/shaders/debris.vert src/shaders/city.vert src/shaders/man.vert
-  src/shaders/mask.vert src/shaders/mask.frag src/shaders/ember.vert)
+  src/shaders/mask.vert src/shaders/mask.frag src/shaders/ember.vert
+  src/shaders/hud.vert src/shaders/hud.frag
+  src/shaders/menu.vert src/shaders/menu.frag)
 set(BW_SHADER_ABS)
 foreach(s ${BW_SHADERS})
   list(APPEND BW_SHADER_ABS ${CMAKE_CURRENT_SOURCE_DIR}/${s})
@@ -107,6 +109,7 @@ endforeach()
 set(BW_SOURCES
   src/main.c src/app.c src/settings.c src/stats.c src/sim.c
   src/render.c src/gl_loader.c src/models.c
+  src/vr.c src/hud.c src/vrmenu.c
   ${BW_SHADERS_GEN} ${BW_MODEL_GEN})
 if(WIN32)
   list(APPEND BW_SOURCES src/platform_win32.c res/win32/theblackwall.rc)

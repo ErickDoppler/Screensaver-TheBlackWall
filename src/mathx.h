@@ -7,6 +7,9 @@
 
 typedef struct { float x, y, z; } vec3;
 typedef struct { float m[16]; } mat4;
+/* An orthonormal frame: x right, y up, z backward (so -z is forward, the
+ * OpenXR/OpenGL convention). Used only for a VR controller/headset pose. */
+typedef struct { vec3 x, y, z; } basis3;
 
 static inline float clampf(float v, float lo, float hi) { return v < lo ? lo : (v > hi ? hi : v); }
 static inline float lerpf(float a, float b, float t) { return a + (b - a) * t; }
@@ -32,6 +35,30 @@ static inline vec3 v3_cross(vec3 a, vec3 b) {
 static inline vec3 v3_norm(vec3 a) {
     float l = sqrtf(v3_dot(a, a));
     return l > 1e-8f ? v3_scale(a, 1.f / l) : a;
+}
+
+static inline vec3 basis_apply(basis3 b, vec3 v) {
+    return v3(b.x.x * v.x + b.y.x * v.y + b.z.x * v.z,
+              b.x.y * v.x + b.y.y * v.y + b.z.y * v.z,
+              b.x.z * v.x + b.y.z * v.y + b.z.z * v.z);
+}
+/* a's rotation applied to b's: b's local directions, turned into a's frame. */
+static inline basis3 basis_mul(basis3 a, basis3 b) {
+    basis3 r = { basis_apply(a, b.x), basis_apply(a, b.y), basis_apply(a, b.z) };
+    return r;
+}
+/* Yaw about +y only, matching the desktop camera's own convention (yaw 0
+ * looks along -z: see the view direction built in render.c). Used to turn a
+ * VR headset's play-space pose into a world direction, since the runtime's
+ * own -z is wherever the player was facing when the session started, not
+ * necessarily at the wall. */
+static inline basis3 basis_yaw(float yaw) {
+    float s = sinf(yaw), c = cosf(yaw);
+    basis3 b;
+    b.x = v3(c, 0.f, s);
+    b.y = v3(0.f, 1.f, 0.f);
+    b.z = v3(-s, 0.f, c);
+    return b;
 }
 
 static inline mat4 m4_identity(void) {
@@ -69,6 +96,33 @@ static inline mat4 m4_look_at(vec3 eye, vec3 center, vec3 up) {
     r.m[12] = -v3_dot(s, eye);
     r.m[13] = -v3_dot(u, eye);
     r.m[14] = v3_dot(f, eye);
+    return r;
+}
+/* View matrix from a camera basis (x right, y up, z back) at `eye` - the
+ * VR headset/eye pose OpenXR hands back is exactly this shape. */
+static inline mat4 m4_view(basis3 b, vec3 eye) {
+    mat4 r = m4_identity();
+    r.m[0] = b.x.x; r.m[4] = b.x.y; r.m[8]  = b.x.z;
+    r.m[1] = b.y.x; r.m[5] = b.y.y; r.m[9]  = b.y.z;
+    r.m[2] = b.z.x; r.m[6] = b.z.y; r.m[10] = b.z.z;
+    r.m[12] = -v3_dot(b.x, eye);
+    r.m[13] = -v3_dot(b.y, eye);
+    r.m[14] = -v3_dot(b.z, eye);
+    return r;
+}
+/* A frustum given the tangents of its four half-angles, which need not be
+ * symmetric: a headset eye looks off to one side of its own screen. Same
+ * near/far mapping as m4_perspective, just with an off-axis projection centre. */
+static inline mat4 m4_frustum(float tl, float tr, float td, float tu, float znear, float zfar) {
+    mat4 r = {{0}};
+    float w = tr - tl, h = tu - td;
+    r.m[0] = 2.f / w;
+    r.m[5] = 2.f / h;
+    r.m[8] = (tr + tl) / w;
+    r.m[9] = (tu + td) / h;
+    r.m[10] = (zfar + znear) / (znear - zfar);
+    r.m[11] = -1.f;
+    r.m[14] = (2.f * zfar * znear) / (znear - zfar);
     return r;
 }
 /* Cheap deterministic PRNG (xorshift32) so the simulation is reproducible. */

@@ -46,7 +46,8 @@
     X(PFNGLBUFFERDATAPROC,             glBufferData) \
     X(PFNGLDELETEBUFFERSPROC,          glDeleteBuffers) \
     X(PFNGLENABLEVERTEXATTRIBARRAYPROC, glEnableVertexAttribArray) \
-    X(PFNGLVERTEXATTRIBPOINTERPROC,    glVertexAttribPointer)
+    X(PFNGLVERTEXATTRIBPOINTERPROC,    glVertexAttribPointer) \
+    X(PFNGLBLITFRAMEBUFFERPROC,        glBlitFramebuffer)
 
 #define BW_GL_DECLARE(type, name) extern type name;
 BW_GL_FUNCS(BW_GL_DECLARE)
